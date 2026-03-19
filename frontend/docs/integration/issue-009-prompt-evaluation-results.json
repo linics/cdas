@@ -1,0 +1,223 @@
+{
+  "base": "http://127.0.0.1:8000",
+  "run_id": "1772455038_mhim",
+  "generated_at": "2026-03-02 20:37:18",
+  "cases": [
+    {
+      "case_id": "C01",
+      "path": "from-lesson-plan",
+      "theme": "校园垃圾分类改进",
+      "elapsed_sec": 25.7,
+      "phase_count": 6,
+      "step_count": 17,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C02",
+      "path": "from-lesson-plan",
+      "theme": "社区老年人数字关怀",
+      "elapsed_sec": 25.55,
+      "phase_count": 6,
+      "step_count": 11,
+      "rubric_dims": 5,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 5,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C03",
+      "path": "from-lesson-plan",
+      "theme": "本地水质微调查",
+      "elapsed_sec": 25.52,
+      "phase_count": 6,
+      "step_count": 11,
+      "rubric_dims": 5,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 5,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C04",
+      "path": "from-lesson-plan",
+      "theme": "校园植物观察日记",
+      "elapsed_sec": 25.56,
+      "phase_count": 6,
+      "step_count": 12,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C05",
+      "path": "from-lesson-plan",
+      "theme": "传统节日文化传播",
+      "elapsed_sec": 25.53,
+      "phase_count": 6,
+      "step_count": 17,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C06",
+      "path": "preview",
+      "theme": "厨余堆肥实验",
+      "elapsed_sec": 82.18,
+      "phase_count": 6,
+      "step_count": 11,
+      "rubric_dims": 5,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 5,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C07",
+      "path": "preview",
+      "theme": "校园导览短视频",
+      "elapsed_sec": 94.74,
+      "phase_count": 6,
+      "step_count": 12,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C08",
+      "path": "preview",
+      "theme": "绿色出行倡议",
+      "elapsed_sec": 92.09,
+      "phase_count": 6,
+      "step_count": 17,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C09",
+      "path": "preview",
+      "theme": "校园噪声治理建议",
+      "elapsed_sec": 62.34,
+      "phase_count": 6,
+      "step_count": 11,
+      "rubric_dims": 5,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 5,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    },
+    {
+      "case_id": "C10",
+      "path": "preview",
+      "theme": "班级阅读推广计划",
+      "elapsed_sec": 90.52,
+      "phase_count": 6,
+      "step_count": 17,
+      "rubric_dims": 6,
+      "objectives_keys": [
+        "emotion",
+        "knowledge",
+        "process"
+      ],
+      "scores": {
+        "continuity": 5,
+        "actionability": 5,
+        "evidence": 4,
+        "non_template": 5,
+        "edit_cost": 5
+      }
+    }
+  ],
+  "avg_continuity": 5,
+  "avg_actionability": 5,
+  "avg_evidence": 4.4,
+  "avg_non_template": 5,
+  "avg_edit_cost": 5,
+  "avg_elapsed_sec": 54.97
+}

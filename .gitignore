@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.venv*/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment Variables
+.env
+.env.local
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+server*.log
+storage/*.log
+
+# Database
+*.db
+*.sqlite3
+storage/*.db
+storage/chroma/
+storage/documents/[0-9]*/
+storage/uvicorn.pid
+*.bak
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+.worktrees/
+.agent/
+.shared/
+docs/references/
+storage/raw/
+actions_page.html
+run_*.html
+job_*.html
+check_log_*.html
+storage/ai_debug.log
+frontend_legacy_*/

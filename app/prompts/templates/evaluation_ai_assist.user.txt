@@ -1,0 +1,32 @@
+Assignment context:
+- Title: {assignment_title}
+- Topic: {assignment_topic}
+- Description: {assignment_description}
+- Objectives JSON: {objectives_json}
+
+Current phase tasks:
+{phase_context}
+
+Submission evidence:
+- text: {submission_text}
+- attachments: {attachments}
+- checkpoints: {checkpoints}
+
+Rubric (dimensions with levels):
+{rubric_text}
+
+Scoring constraints:
+1) Score each rubric dimension strictly from 1-4.
+2) dimension_scores keys must exactly match rubric dimension names.
+3) If evidence is insufficient, lower the score and explain why.
+4) evidence must include short quotes from submission text or explicit attachment/checkpoint references.
+5) feedback should have three concise parts: strengths, gaps, next focus.
+6) action_items should be 2-3 concrete next-step suggestions for the student.
+
+Return JSON with fields:
+- suggested_score (1-4, average)
+- suggested_level (excellent/good/pass/improve)
+- dimension_scores (object)
+- feedback (single string)
+- evidence (list of {{source, quote, reason}})
+- action_items (list of strings)
