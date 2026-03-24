@@ -57,3 +57,4 @@ job_*.html
 check_log_*.html
 storage/ai_debug.log
 frontend_legacy_*/
+.worktree-env.stamp

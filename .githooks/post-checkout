@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+STAMP_FILE="$ROOT_DIR/.worktree-env.stamp"
+
+if [[ ! -x "$ROOT_DIR/scripts/bootstrap_worktree_env.sh" ]]; then
+  exit 0
+fi
+
+if [[ ! -f "$STAMP_FILE" ]]; then
+  "$ROOT_DIR/scripts/bootstrap_worktree_env.sh"
+  exit 0
+fi
+
+if [[ "$3" == "1" && ! -d "$ROOT_DIR/frontend/node_modules" ]]; then
+  "$ROOT_DIR/scripts/bootstrap_worktree_env.sh"
+fi

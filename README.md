@@ -39,6 +39,29 @@ npm run dev:local
 
 前端地址：`http://127.0.0.1:5173`
 
+### 3. Worktree 自动初始化
+
+首次在仓库中启用版本化 Git hook：
+
+```bash
+bash scripts/install_worktree_hook.sh
+```
+
+启用后，执行 `git worktree add ...` 创建新工作树时，会自动运行：
+
+- `scripts/bootstrap_worktree_env.sh`
+- 若 `.env` 不存在，则从 `.env.example` 生成
+- 若 `frontend/.env.local` 不存在，则写入本地开发默认值
+- 创建 `storage/`、`storage/documents/`、`storage/chroma/`
+- 修复或创建 `.venv312`，并安装 `requirements.txt`
+- 若 `frontend/node_modules` 缺失，则执行 `npm install`
+
+脚本是幂等的，可手动重复运行：
+
+```bash
+bash scripts/bootstrap_worktree_env.sh
+```
+
 ## 环境变量
 
 建议在项目根目录配置 `.env`。至少需要：
