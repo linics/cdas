@@ -9,8 +9,32 @@ script = ""
 name = "启动服务"
 icon = "run"
 command = '''
-cd /Users/linics/Documents/githubfiles/cdas
-./.venv312/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-cd /Users/linics/Documents/githubfiles/cdas/frontend
-npm run dev:local
+ROOT="$(git rev-parse --show-toplevel)"
+
+for PORT in 8000 5173; do
+  PIDS="$(lsof -ti tcp:$PORT 2>/dev/null)"
+  if [ -n "$PIDS" ]; then
+    kill $PIDS 2>/dev/null || true
+    sleep 1
+    STILL_RUNNING="$(lsof -ti tcp:$PORT 2>/dev/null)"
+    if [ -n "$STILL_RUNNING" ]; then
+      kill -9 $STILL_RUNNING 2>/dev/null || true
+    fi
+  fi
+done
+
+(
+  cd "$ROOT" || exit 1
+  ./.venv312/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+) &
+BACK_PID=$!
+
+(
+  cd "$ROOT/frontend" || exit 1
+  npm run dev:local
+) &
+FRONT_PID=$!
+
+trap 'kill $BACK_PID $FRONT_PID 2>/dev/null' EXIT INT TERM
+wait
 '''

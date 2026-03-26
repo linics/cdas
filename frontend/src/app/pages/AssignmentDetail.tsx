@@ -893,26 +893,26 @@ export function AssignmentDetail() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <section className="bg-white rounded-3xl border border-slate-100 p-6 space-y-3">
+      <section className="bg-surface rounded-2xl border border-border p-6 space-y-3">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black text-slate-900">{assignment.title}</h1>
-            <p className="text-sm text-slate-500 mt-2">{assignment.description || assignment.topic}</p>
-            <p className="text-xs text-slate-500 mt-2">
+            <h1 className="text-3xl font-black text-text">{assignment.title}</h1>
+            <p className="text-sm text-text-secondary mt-2">{assignment.description || assignment.topic}</p>
+            <p className="text-xs text-text-secondary mt-2">
               学段：{stageToSchoolLevel(assignment.school_stage)} · 年级：{gradeLabel(assignment.grade)} · 提交模式：
               {submissionModeLabel(assignment.submission_mode)}
             </p>
             {assignmentNarrative.background && (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2">
-                <p className="text-[11px] font-semibold text-indigo-700">背景设定</p>
-                <p className="text-xs text-indigo-800 mt-1 leading-relaxed">{assignmentNarrative.background}</p>
+              <div className="mt-3 rounded-xl border border-secondary bg-secondary px-3 py-2">
+                <p className="text-[11px] font-semibold text-primary">背景设定</p>
+                <p className="text-xs text-primary mt-1 leading-relaxed">{assignmentNarrative.background}</p>
                 {assignmentNarrative.process && (
-                  <p className="text-[11px] text-indigo-700 mt-2">任务主线：{assignmentNarrative.process}</p>
+                  <p className="text-[11px] text-primary mt-2">任务主线：{assignmentNarrative.process}</p>
                 )}
               </div>
             )}
           </div>
-          <Link to={backPath} className="text-sm font-semibold text-indigo-600 hover:underline">
+          <Link to={backPath} className="text-sm font-semibold text-primary hover:underline">
             {backLabel}
           </Link>
         </div>
@@ -921,16 +921,16 @@ export function AssignmentDetail() {
       </section>
 
       {user?.role === "teacher" && (
-        <section className="bg-amber-50 border border-amber-100 rounded-3xl p-6 text-sm text-amber-800">
+        <section className="bg-warning-soft border border-warning/20 rounded-2xl p-6 text-sm text-warning">
           教师端建议通过“评价批改”页面查看学生提交并评分。
         </section>
       )}
 
       {user?.role === "teacher" && (
-        <section className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+        <section className="bg-surface rounded-2xl border border-border p-6 space-y-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">作业小组（协作模式）</h2>
-            <p className="text-xs text-slate-500 mt-1">可为该作业创建小组并配置成员，成员将共享小组提交记录与评价可见性。</p>
+            <h2 className="text-lg font-bold text-text">作业小组（协作模式）</h2>
+            <p className="text-xs text-text-secondary mt-1">可为该作业创建小组并配置成员，成员将共享小组提交记录与评价可见性。</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto] gap-2">
@@ -938,7 +938,7 @@ export function AssignmentDetail() {
               value={groupNameInput}
               onChange={(e) => setGroupNameInput(e.target.value)}
               placeholder="小组名称，例如：第一组"
-              className="px-3 py-2 rounded-lg border border-slate-200"
+              className="px-3 py-2 rounded-lg border border-border-strong"
             />
             <select
               value={selectedClassId ? String(selectedClassId) : ""}
@@ -948,7 +948,7 @@ export function AssignmentDetail() {
                 setSelectedMemberIds([]);
                 setCreateMemberSearch("");
               }}
-              className="px-3 py-2 rounded-lg border border-slate-200"
+              className="px-3 py-2 rounded-lg border border-border-strong"
             >
               <option value="">选择成员来源班级</option>
               {teacherClasses.map((item) => (
@@ -960,30 +960,30 @@ export function AssignmentDetail() {
             <button
               onClick={createAssignmentGroup}
               disabled={creatingGroup || selectedMemberIds.length === 0}
-              className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+              className="px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60"
             >
               {creatingGroup ? "创建中..." : "创建小组"}
             </button>
           </div>
 
           {teacherClasses.length === 0 ? (
-            <p className="text-xs text-slate-500">你还没有可用班级，请先到“班级与小组”页面创建班级并让学生入班。</p>
+            <p className="text-xs text-text-secondary">你还没有可用班级，请先到“班级与小组”页面创建班级并让学生入班。</p>
           ) : (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-3">
+            <div className="rounded-xl border border-border-strong bg-surface-muted p-3 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-slate-700">可选成员（班级学生）</p>
+                <p className="text-xs font-semibold text-text">可选成员（班级学生）</p>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={selectAllMembers}
                     disabled={classMembers.length === 0}
-                    className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-white disabled:opacity-60"
+                    className="text-[11px] px-2 py-1 rounded border border-border-strong hover:bg-surface disabled:opacity-60"
                   >
                     全选
                   </button>
                   <button
                     onClick={clearSelectedMembers}
                     disabled={selectedMemberIds.length === 0}
-                    className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-white disabled:opacity-60"
+                    className="text-[11px] px-2 py-1 rounded border border-border-strong hover:bg-surface disabled:opacity-60"
                   >
                     清空
                   </button>
@@ -991,34 +991,34 @@ export function AssignmentDetail() {
               </div>
 
               {loadingClassMembers ? (
-                <p className="text-xs text-slate-500 flex items-center gap-1">
+                <p className="text-xs text-text-secondary flex items-center gap-1">
                   <LoaderCircle className="w-3.5 h-3.5 animate-spin" /> 加载班级学生中...
                 </p>
               ) : !selectedClassId ? (
-                <p className="text-xs text-slate-500">请选择一个班级后再选择成员。</p>
+                <p className="text-xs text-text-secondary">请选择一个班级后再选择成员。</p>
               ) : classMembers.length === 0 ? (
-                <p className="text-xs text-slate-500">该班级暂无学生。</p>
+                <p className="text-xs text-text-secondary">该班级暂无学生。</p>
               ) : (
                 <div className="space-y-2">
                   <input
                     value={createMemberSearch}
                     onChange={(e) => setCreateMemberSearch(e.target.value)}
                     placeholder="搜索学生姓名 / 账号 / ID"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                    className="w-full px-3 py-2 rounded-lg border border-border-strong text-xs"
                   />
                   {filteredCreateMembers.length === 0 ? (
-                    <p className="text-xs text-slate-500">未找到匹配学生。</p>
+                    <p className="text-xs text-text-secondary">未找到匹配学生。</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {filteredCreateMembers.map((member) => (
-                        <label key={member.member_id} className="flex items-center gap-2 text-sm text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <label key={member.member_id} className="flex items-center gap-2 text-sm text-text bg-surface border border-border-strong rounded-lg px-3 py-2">
                           <input
                             type="checkbox"
                             checked={selectedMemberIds.includes(member.student_id)}
                             onChange={() => toggleMemberSelection(member.student_id)}
                           />
                           <span className="font-medium">{member.student_name}</span>
-                          <span className="text-xs text-slate-500">({member.student_username})</span>
+                          <span className="text-xs text-text-secondary">({member.student_username})</span>
                         </label>
                       ))}
                     </div>
@@ -1026,54 +1026,54 @@ export function AssignmentDetail() {
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-500">已选择 {selectedMemberIds.length} 人</p>
+              <p className="text-[11px] text-text-secondary">已选择 {selectedMemberIds.length} 人</p>
             </div>
           )}
 
           {assignmentGroups.length === 0 ? (
-            <p className="text-sm text-slate-500">当前作业暂无小组。</p>
+            <p className="text-sm text-text-secondary">当前作业暂无小组。</p>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {assignmentGroups.map((group) => (
-                  <div key={group.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div key={group.id} className="rounded-xl border border-border-strong bg-surface-muted p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-800">{group.name}</p>
+                      <p className="text-sm font-semibold text-text">{group.name}</p>
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => startEditGroupMembers(group)}
                           disabled={updatingGroupMembers && editingGroupId === group.id}
-                          className="text-xs px-2 py-1 rounded-md border border-indigo-200 text-indigo-600 hover:bg-indigo-50 disabled:opacity-60"
+                          className="text-xs px-2 py-1 rounded-md border border-secondary text-primary hover:bg-secondary disabled:opacity-60"
                         >
                           编辑成员
                         </button>
                         <button
                           onClick={() => deleteAssignmentGroup(group)}
                           disabled={deletingGroupId === group.id || (editingGroupId === group.id && updatingGroupMembers)}
-                          className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60"
+                          className="text-xs px-2 py-1 rounded-md border border-danger/25 text-danger hover:bg-danger-soft disabled:opacity-60"
                         >
                           {deletingGroupId === group.id ? "删除中..." : "删除"}
                         </button>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">成员：{groupMemberText(group)}</p>
+                    <p className="text-xs text-text-secondary mt-1">成员：{groupMemberText(group)}</p>
 
                     {editingGroupId === group.id && (
-                      <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 p-3 space-y-3">
+                      <div className="mt-3 rounded-lg border border-secondary bg-secondary p-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-indigo-700">编辑小组成员</p>
+                          <p className="text-xs font-semibold text-primary">编辑小组成员</p>
                           <div className="flex items-center gap-2">
                             <button
                               onClick={selectAllEditingMembers}
                               disabled={editingMemberCandidates.length === 0 || updatingGroupMembers}
-                              className="text-[11px] px-2 py-1 rounded border border-indigo-200 text-indigo-700 hover:bg-white disabled:opacity-60"
+                              className="text-[11px] px-2 py-1 rounded border border-secondary text-primary hover:bg-surface disabled:opacity-60"
                             >
                               全选
                             </button>
                             <button
                               onClick={clearEditingMembers}
                               disabled={editingMemberIds.length === 0 || updatingGroupMembers}
-                              className="text-[11px] px-2 py-1 rounded border border-indigo-200 text-indigo-700 hover:bg-white disabled:opacity-60"
+                              className="text-[11px] px-2 py-1 rounded border border-secondary text-primary hover:bg-surface disabled:opacity-60"
                             >
                               清空
                             </button>
@@ -1089,7 +1089,7 @@ export function AssignmentDetail() {
                               setCreateMemberSearch("");
                               setEditMemberSearch("");
                             }}
-                            className="px-2.5 py-2 rounded-md border border-indigo-200 text-xs"
+                            className="px-2.5 py-2 rounded-md border border-secondary text-xs"
                           >
                             <option value="">切换班级（编辑成员来源）</option>
                             {teacherClasses.map((item) => (
@@ -1102,16 +1102,16 @@ export function AssignmentDetail() {
                             value={editMemberSearch}
                             onChange={(e) => setEditMemberSearch(e.target.value)}
                             placeholder="搜索姓名 / 账号 / ID"
-                            className="px-2.5 py-2 rounded-md border border-indigo-200 text-xs"
+                            className="px-2.5 py-2 rounded-md border border-secondary text-xs"
                           />
                         </div>
 
                         {filteredEditingMembers.length === 0 ? (
-                          <p className="text-xs text-indigo-700">暂无可选成员，请先选择班级加载学生列表。</p>
+                          <p className="text-xs text-primary">暂无可选成员，请先选择班级加载学生列表。</p>
                         ) : (
                           <div className="space-y-2 max-h-44 overflow-auto pr-1">
                             {filteredEditingMembers.map((member) => (
-                              <label key={`${group.id}_${member.user_id}`} className="flex items-center gap-2 text-xs text-slate-700 bg-white border border-slate-200 rounded-md px-2 py-1.5">
+                              <label key={`${group.id}_${member.user_id}`} className="flex items-center gap-2 text-xs text-text bg-surface border border-border-strong rounded-md px-2 py-1.5">
                                 <input
                                   type="checkbox"
                                   checked={editingMemberIds.includes(member.user_id)}
@@ -1119,26 +1119,26 @@ export function AssignmentDetail() {
                                   disabled={updatingGroupMembers}
                                 />
                                 <span className="font-medium">{member.name || `ID:${member.user_id}`}</span>
-                                {member.username && <span className="text-slate-500">({member.username})</span>}
+                                {member.username && <span className="text-text-secondary">({member.username})</span>}
                               </label>
                             ))}
                           </div>
                         )}
 
-                        <p className="text-[11px] text-indigo-700">已选择 {editingMemberIds.length} 人</p>
+                        <p className="text-[11px] text-primary">已选择 {editingMemberIds.length} 人</p>
 
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={cancelEditGroupMembers}
                             disabled={updatingGroupMembers}
-                            className="text-xs px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-white disabled:opacity-60"
+                            className="text-xs px-2.5 py-1.5 rounded-md border border-border-strong text-text-secondary hover:bg-surface disabled:opacity-60"
                           >
                             取消
                           </button>
                           <button
                             onClick={() => saveGroupMembers(group)}
                             disabled={updatingGroupMembers}
-                            className="text-xs px-2.5 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                            className="text-xs px-2.5 py-1.5 rounded-md bg-primary text-white hover:bg-primary-hover active:bg-primary-active disabled:opacity-60"
                           >
                             {updatingGroupMembers ? "保存中..." : "保存成员"}
                           </button>
@@ -1149,16 +1149,16 @@ export function AssignmentDetail() {
                 ))}
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+              <div className="rounded-xl border border-border-strong bg-surface-muted p-4 space-y-2">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <h3 className="text-sm font-bold text-slate-700">小组提交进展</h3>
+                  <h3 className="text-sm font-bold text-text">小组提交进展</h3>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setGroupRiskFilter("all")}
                       className={`text-[11px] px-2 py-1 rounded-full border ${
                         groupRiskFilter === "all"
-                          ? "bg-slate-800 border-slate-800 text-white"
-                          : "bg-white border-slate-200 text-slate-600"
+                          ? "bg-text border-text text-surface"
+                          : "bg-surface border-border-strong text-text-secondary"
                       }`}
                     >
                       全部（{groupProgress.length}）
@@ -1167,8 +1167,8 @@ export function AssignmentDetail() {
                       onClick={() => setGroupRiskFilter("high")}
                       className={`text-[11px] px-2 py-1 rounded-full border ${
                         groupRiskFilter === "high"
-                          ? "bg-red-600 border-red-600 text-white"
-                          : "bg-white border-red-200 text-red-600"
+                          ? "bg-danger border-danger text-white"
+                          : "bg-surface border-danger/25 text-danger"
                       }`}
                     >
                       仅高风险（{highRiskCount}）
@@ -1177,12 +1177,12 @@ export function AssignmentDetail() {
                 </div>
 
                 {visibleGroupProgress.length === 0 ? (
-                  <p className="text-xs text-slate-500">当前筛选条件下暂无小组。</p>
+                  <p className="text-xs text-text-secondary">当前筛选条件下暂无小组。</p>
                 ) : (
                   visibleGroupProgress.map((item) => (
-                  <div key={item.group.id} className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+                  <div key={item.group.id} className="bg-surface border border-border-strong rounded-lg px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-800">{item.group.name}</p>
+                      <p className="text-sm font-semibold text-text">{item.group.name}</p>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1196,12 +1196,12 @@ export function AssignmentDetail() {
                           title={item.riskScore >= 2 ? "点击切换高风险筛选" : "低风险项，点击恢复全部"}
                           className={`text-[11px] px-2 py-0.5 rounded-full ${
                             item.riskScore >= 3
-                              ? "bg-red-100 text-red-700"
+                              ? "bg-danger-soft text-danger"
                               : item.riskScore >= 2
-                                ? "bg-amber-100 text-amber-700"
+                                ? "bg-warning-soft text-warning"
                                 : item.riskScore >= 1
-                                  ? "bg-indigo-100 text-indigo-700"
-                                  : "bg-emerald-100 text-emerald-700"
+                                  ? "bg-secondary text-primary"
+                                  : "bg-success-soft text-success"
                           }`}
                         >
                           {item.riskText}
@@ -1209,19 +1209,19 @@ export function AssignmentDetail() {
                         {item.latestSubmission ? (
                           <Link
                             to={`/grading/${item.latestSubmission.id}`}
-                            className="text-xs font-semibold text-indigo-600 hover:underline"
+                            className="text-xs font-semibold text-primary hover:underline"
                           >
                             批改最新提交
                           </Link>
                         ) : (
-                          <span className="text-xs text-slate-400">暂无提交</span>
+                          <span className="text-xs text-text-muted">暂无提交</span>
                         )}
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-text-secondary mt-1">
                       阶段进度 {item.phaseProgress} · 提交 {item.totalSubmissions} 次 · 待评分 {item.submittedCount} · 已评分 {item.gradedCount}
                     </p>
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-[11px] text-text-muted mt-1">
                       最近提交：{formatDateTime(item.lastSubmittedAt)} · 最近评分：{formatDateTime(item.lastEvaluatedAt)}
                     </p>
                   </div>
@@ -1233,9 +1233,9 @@ export function AssignmentDetail() {
       )}
 
       {user?.role === "student" && submissions.length === 0 && (
-        <section className="bg-white rounded-3xl border border-slate-100 p-8">
-          <p className="text-sm text-slate-600 mb-2">你还没有该作业的提交记录，点击下方按钮创建第一阶段草稿。</p>
-          <p className="text-xs text-slate-500 mb-4">
+        <section className="bg-surface rounded-2xl border border-border p-8">
+          <p className="text-sm text-text-secondary mb-2">你还没有该作业的提交记录，点击下方按钮创建第一阶段草稿。</p>
+          <p className="text-xs text-text-secondary mb-4">
             {myJoinedGroup
               ? `当前将使用小组模式提交：${myJoinedGroup.name}`
               : "当前使用个人模式提交（如教师已配置作业小组，请先确认你已在小组成员中）。"}
@@ -1243,7 +1243,7 @@ export function AssignmentDetail() {
           <button
             onClick={startFirstSubmission}
             disabled={starting}
-            className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+            className="px-5 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center gap-2"
           >
             {starting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />} 开始作业
           </button>
@@ -1252,15 +1252,15 @@ export function AssignmentDetail() {
 
       {submissions.length > 0 && (
         <section className="grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
-          <article className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+          <article className="bg-surface rounded-2xl border border-border p-6 space-y-5">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               {user?.role === "teacher" && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-slate-500">筛选小组</label>
+                  <label className="text-xs text-text-secondary">筛选小组</label>
                   <select
                     value={teacherGroupFilter}
                     onChange={(e) => setTeacherGroupFilter(e.target.value)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+                    className="px-3 py-2 rounded-lg border border-border-strong text-xs"
                   >
                     <option value="all">全部提交</option>
                     <option value="ungrouped">仅个人提交</option>
@@ -1283,8 +1283,8 @@ export function AssignmentDetail() {
                       onClick={() => setActiveSubmissionId(submission.id)}
                       className={`px-3 py-2 text-xs rounded-full border ${
                         activeSubmissionId === submission.id
-                          ? "bg-indigo-600 border-indigo-600 text-white"
-                          : "bg-white border-slate-200 text-slate-600"
+                          ? "bg-primary border-primary text-white"
+                          : "bg-surface border-border-strong text-text-secondary"
                       }`}
                     >
                       阶段 {submission.phase_index + 1}
@@ -1292,13 +1292,13 @@ export function AssignmentDetail() {
                     </button>
                   ))}
                 {visibleSubmissions.length === 0 && user?.role === "teacher" && (
-                  <p className="text-xs text-slate-500">当前筛选条件下暂无提交。</p>
+                  <p className="text-xs text-text-secondary">当前筛选条件下暂无提交。</p>
                 )}
               </div>
               {user?.role === "teacher" && activeSubmission && (
                 <Link
                   to={`/grading/${activeSubmission.id}`}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover active:bg-primary-active"
                 >
                   进入评分
                 </Link>
@@ -1306,44 +1306,44 @@ export function AssignmentDetail() {
             </div>
 
             {currentPhase && (
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-border bg-surface-muted p-4">
                 {user?.role === "student" && assignmentNarrative.background && (
-                  <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 mb-3">
-                    <p className="text-[11px] font-semibold text-indigo-700">当前任务背景</p>
-                    <p className="text-xs text-indigo-800 mt-1 leading-relaxed">{assignmentNarrative.background}</p>
+                  <div className="rounded-lg border border-secondary bg-secondary px-3 py-2 mb-3">
+                    <p className="text-[11px] font-semibold text-primary">当前任务背景</p>
+                    <p className="text-xs text-primary mt-1 leading-relaxed">{assignmentNarrative.background}</p>
                   </div>
                 )}
-                <h2 className="text-sm font-bold text-slate-700 mb-3">
+                <h2 className="text-sm font-bold text-text mb-3">
                   当前阶段：
                   {currentPhase.title || currentPhase.name || `阶段 ${(activeSubmission?.phase_index ?? 0) + 1}`}
                 </h2>
                 {currentPhase.title && currentPhase.name && currentPhase.title !== currentPhase.name && (
-                  <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mb-3">
+                  <p className="text-xs text-primary bg-secondary border border-secondary rounded-lg px-3 py-2 mb-3">
                     阶段情境导引：{currentPhase.title}
                   </p>
                 )}
                 <div className="space-y-3">
                   {(currentPhase.steps || []).map((step, index) => (
-                    <div key={`${step.name}_${index}`} className="bg-white border border-slate-100 rounded-xl p-3">
-                      <div className="text-sm font-semibold text-slate-800 mb-1">
+                    <div key={`${step.name}_${index}`} className="bg-surface border border-border rounded-xl p-3">
+                      <div className="text-sm font-semibold text-text mb-1">
                         {index + 1}. {step.name || step.content || step.description || `步骤 ${index + 1}`}
                       </div>
                       {step.content && step.content !== step.name && (
-                        <p className="text-xs text-indigo-700 mb-2">情境承接：{step.content}</p>
+                        <p className="text-xs text-primary mb-2">情境承接：{step.content}</p>
                       )}
                       {step.description && (
-                        <p className="text-xs text-slate-600 mb-2">
-                          <span className="font-semibold text-slate-700">学习支架：</span>
+                        <p className="text-xs text-text-secondary mb-2">
+                          <span className="font-semibold text-text">学习支架：</span>
                           {step.description}
                         </p>
                       )}
                       {Array.isArray(step.checkpoints) && step.checkpoints.length > 0 && (
-                        <ul className="text-xs text-slate-600 space-y-1">
+                        <ul className="text-xs text-text-secondary space-y-1">
                           {step.checkpoints.map((cp, cpIdx) => (
                             <li key={`${cp.content}_${cpIdx}`} className="flex items-start gap-2">
-                              <Circle className="w-3 h-3 mt-0.5 text-slate-400" />
+                              <Circle className="w-3 h-3 mt-0.5 text-text-muted" />
                               <span>
-                                <span className="font-semibold text-slate-700">提交证据：</span>
+                                <span className="font-semibold text-text">提交证据：</span>
                                 {cp.content}
                                 {cp.evidence_type ? `（${evidenceTypeLabel(cp.evidence_type)}）` : ""}
                               </span>
@@ -1358,10 +1358,10 @@ export function AssignmentDetail() {
             )}
 
             {activeSubmission?.group_name && (
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                <p className="text-xs text-indigo-700">当前提交模式</p>
-                <p className="text-sm font-semibold text-indigo-800 mt-1">小组提交：{activeSubmission.group_name}</p>
-                <p className="text-xs text-indigo-700 mt-1">
+              <div className="rounded-2xl border border-secondary bg-secondary p-4">
+                <p className="text-xs text-primary">当前提交模式</p>
+                <p className="text-sm font-semibold text-primary mt-1">小组提交：{activeSubmission.group_name}</p>
+                <p className="text-xs text-primary mt-1">
                   成员：
                   {(activeSubmission.group_members || [])
                     .map((member) => member.name || member.username || `ID:${member.user_id}`)
@@ -1371,12 +1371,12 @@ export function AssignmentDetail() {
             )}
 
             <div className="space-y-3">
-              <label className="text-sm font-semibold text-slate-700">我的提交内容</label>
+              <label className="text-sm font-semibold text-text">我的提交内容</label>
               {!readOnly && phaseEvidenceHints.length > 0 && (
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 space-y-2">
+                <div className="rounded-xl border border-secondary bg-secondary p-3 space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs font-semibold text-indigo-800">阶段证据检查清单</p>
-                    <p className="text-[11px] text-indigo-700">
+                    <p className="text-xs font-semibold text-primary">阶段证据检查清单</p>
+                    <p className="text-[11px] text-primary">
                       已覆盖 {coveredEvidenceCount}/{phaseEvidenceHints.length}
                     </p>
                   </div>
@@ -1385,7 +1385,7 @@ export function AssignmentDetail() {
                       <button
                         key={`${hint.content}_${idx}`}
                         onClick={() => addHintToSubmission(hint.content)}
-                        className="text-[11px] px-2.5 py-1.5 rounded-full border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-100"
+                        className="text-[11px] px-2.5 py-1.5 rounded-full border border-secondary bg-surface text-primary hover:bg-secondary"
                         title="点击加入提交内容"
                         type="button"
                       >
@@ -1394,7 +1394,7 @@ export function AssignmentDetail() {
                       </button>
                     ))}
                   </div>
-                  <p className="text-[11px] text-indigo-700">点击条目可快速插入到下方“我的提交内容”。</p>
+                  <p className="text-[11px] text-primary">点击条目可快速插入到下方“我的提交内容”。</p>
                 </div>
               )}
               <textarea
@@ -1407,46 +1407,46 @@ export function AssignmentDetail() {
                     : "请填写你的阶段成果、数据分析与反思。"
                 }
                 disabled={readOnly}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 resize-none disabled:bg-slate-100"
+                className="w-full px-4 py-3 rounded-xl border border-border-strong resize-none disabled:bg-secondary"
               />
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-semibold text-slate-700">附件链接</label>
+              <label className="text-sm font-semibold text-text">附件链接</label>
               <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-2">
                 <input
                   value={attachmentName}
                   onChange={(e) => setAttachmentName(e.target.value)}
                   placeholder="附件名称"
                   disabled={readOnly}
-                  className="px-3 py-2 rounded-lg border border-slate-200 disabled:bg-slate-100"
+                  className="px-3 py-2 rounded-lg border border-border-strong disabled:bg-secondary"
                 />
                 <input
                   value={attachmentUrl}
                   onChange={(e) => setAttachmentUrl(e.target.value)}
                   placeholder="https://..."
                   disabled={readOnly}
-                  className="px-3 py-2 rounded-lg border border-slate-200 disabled:bg-slate-100"
+                  className="px-3 py-2 rounded-lg border border-border-strong disabled:bg-secondary"
                 />
                 <button
                   onClick={addAttachment}
                   disabled={readOnly}
-                  className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
+                  className="px-4 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted disabled:opacity-60"
                 >
                   添加
                 </button>
               </div>
               <div className="space-y-2">
-                {attachments.length === 0 && <p className="text-xs text-slate-500">暂无附件链接</p>}
+                {attachments.length === 0 && <p className="text-xs text-text-secondary">暂无附件链接</p>}
                 {attachments.map((item, index) => (
-                  <div key={`${item.filename}_${index}`} className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
-                    <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline truncate">
+                  <div key={`${item.filename}_${index}`} className="flex items-center justify-between gap-3 bg-surface-muted border border-border rounded-lg px-3 py-2">
+                    <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline truncate">
                       {item.filename}
                     </a>
                     {!readOnly && (
                       <button
                         onClick={() => removeAttachment(index)}
-                        className="text-red-500 hover:text-red-600"
+                        className="text-danger hover:text-danger"
                         title="删除附件"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1462,14 +1462,14 @@ export function AssignmentDetail() {
                 <button
                   onClick={saveDraft}
                   disabled={saving}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60 flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl border border-border-strong text-sm font-semibold hover:bg-surface-muted disabled:opacity-60 flex items-center gap-2"
                 >
                   {saving ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 保存草稿
                 </button>
                 <button
                   onClick={submitCurrent}
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center gap-2"
                 >
                   {submitting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} 提交本阶段
                 </button>
@@ -1478,36 +1478,36 @@ export function AssignmentDetail() {
           </article>
 
           <aside className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-100 p-5">
-              <h3 className="font-bold text-slate-800 mb-3">教师反馈</h3>
-              {!teacherEvaluation && <p className="text-xs text-slate-500">当前阶段暂无教师评分反馈。</p>}
+            <div className="bg-surface rounded-2xl border border-border p-5">
+              <h3 className="font-bold text-text mb-3">教师反馈</h3>
+              {!teacherEvaluation && <p className="text-xs text-text-secondary">当前阶段暂无教师评分反馈。</p>}
               {teacherEvaluation && (
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">等级</span>
-                    <span className="font-bold text-indigo-700">{scoreLabel(teacherEvaluation.score_level)}</span>
+                    <span className="text-text-secondary">等级</span>
+                    <span className="font-bold text-primary">{scoreLabel(teacherEvaluation.score_level)}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-500">分值</span>
-                    <span className="font-bold text-indigo-700">{teacherEvaluation.score_numeric || "-"}</span>
+                    <span className="text-text-secondary">分值</span>
+                    <span className="font-bold text-primary">{teacherEvaluation.score_numeric || "-"}</span>
                   </div>
-                  <div className="border-t border-slate-100 pt-2">
-                    <p className="text-xs text-slate-500 mb-1">评语</p>
-                    <p className="text-sm text-slate-700 leading-relaxed">{teacherEvaluation.feedback || "暂无"}</p>
+                  <div className="border-t border-border pt-2">
+                    <p className="text-xs text-text-secondary mb-1">评语</p>
+                    <p className="text-sm text-text leading-relaxed">{teacherEvaluation.feedback || "暂无"}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-5">
-              <h3 className="font-bold text-indigo-800 mb-2 flex items-center gap-2">
+            <div className="bg-secondary rounded-2xl border border-secondary p-5">
+              <h3 className="font-bold text-primary mb-2 flex items-center gap-2">
                 <Sparkles className="w-4 h-4" /> 提交建议
               </h3>
-              <p className="text-xs text-indigo-700 leading-relaxed">
+              <p className="text-xs text-primary leading-relaxed">
                 提交前请核对每个检查点是否有对应证据，避免因为证据缺失影响评价结果。
               </p>
               {activeSubmission && activeSubmission.status === "graded" && (
-                <div className="mt-3 text-xs text-emerald-700 flex items-center gap-1">
+                <div className="mt-3 text-xs text-success flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" /> 当前阶段已评分，可继续下一阶段。
                 </div>
               )}

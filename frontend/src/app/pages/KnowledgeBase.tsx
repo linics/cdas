@@ -185,14 +185,14 @@ export function KnowledgeBase() {
       <section className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold mb-1">知识库</h1>
-          <p className="text-sm text-slate-500">课程标准文档 + 自定义教学资料统一管理。</p>
+          <p className="text-sm text-text-secondary">课程标准文档 + 自定义教学资料统一管理。</p>
         </div>
         <div className="flex items-center gap-3">
           <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleUpload} />
           <button
             onClick={handleChooseFile}
             disabled={uploading}
-            className="px-5 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+            className="px-5 py-3 bg-primary text-white rounded-xl font-bold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center gap-2"
           >
             {uploading ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} 上传文档
           </button>
@@ -205,36 +205,36 @@ export function KnowledgeBase() {
 
       {notice && <StatusBanner tone="success" message={notice} />}
 
-      <section className="bg-white border border-slate-100 rounded-3xl p-6">
+      <section className="bg-surface border border-border rounded-2xl p-6">
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-emerald-600" /> 系统内置课程标准知识库
+            <BookOpen className="w-5 h-5 text-success" /> 系统内置课程标准知识库
           </h2>
           {builtInFailedCount > 0 ? (
-            <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-full font-semibold">存在异常</span>
+            <span className="text-xs bg-danger-soft text-danger px-2 py-1 rounded-full font-semibold">存在异常</span>
           ) : builtInProcessingCount > 0 ? (
-            <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full font-semibold">索引处理中</span>
+            <span className="text-xs bg-warning-soft text-warning px-2 py-1 rounded-full font-semibold">索引处理中</span>
           ) : (
-            <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full font-semibold">已就绪</span>
+            <span className="text-xs bg-success-soft text-success px-2 py-1 rounded-full font-semibold">已就绪</span>
           )}
         </div>
 
-        <p className="text-xs text-slate-500 mb-4">
+        <p className="text-xs text-text-secondary mb-4">
           来源：预置《义务教育课程标准（2022年版）》学科文档，系统已按语义切分为 RAG chunks，不需要逐个文件操作。
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-            <p className="text-[11px] text-emerald-700">内置文档</p>
-            <p className="text-xl font-black text-emerald-700">{builtInDocs.length}</p>
+          <div className="rounded-xl border border-success/20 bg-success-soft p-3">
+            <p className="text-[11px] text-success">内置文档</p>
+            <p className="text-xl font-black text-success">{builtInDocs.length}</p>
           </div>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
-            <p className="text-[11px] text-indigo-700">知识块（chunks）</p>
-            <p className="text-xl font-black text-indigo-700">{builtInChunkCount}</p>
+          <div className="rounded-xl border border-secondary bg-secondary p-3">
+            <p className="text-[11px] text-primary">知识块（chunks）</p>
+            <p className="text-xl font-black text-primary">{builtInChunkCount}</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <p className="text-[11px] text-slate-600">就绪文档</p>
-            <p className="text-xl font-black text-slate-700">{builtInReadyCount}</p>
+          <div className="rounded-xl border border-border-strong bg-surface-muted p-3">
+            <p className="text-[11px] text-text-secondary">就绪文档</p>
+            <p className="text-xl font-black text-text">{builtInReadyCount}</p>
           </div>
         </div>
 
@@ -242,7 +242,7 @@ export function KnowledgeBase() {
           {BUILT_IN_SUBJECTS.map((subject) => (
             <span
               key={subject}
-              className="text-xs px-2 py-1 rounded-full border border-emerald-100 bg-emerald-50 text-emerald-700"
+              className="text-xs px-2 py-1 rounded-full border border-success/20 bg-success-soft text-success"
             >
               {subject}
             </span>
@@ -258,20 +258,20 @@ export function KnowledgeBase() {
         )}
       </section>
 
-      <section className="bg-white border border-slate-100 rounded-3xl p-6">
+      <section className="bg-surface border border-border rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-600" /> 我的教学资料
+            <FileText className="w-5 h-5 text-primary" /> 我的教学资料
           </h2>
-          <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full font-semibold">
+          <span className="text-xs bg-secondary text-primary px-2 py-1 rounded-full font-semibold">
             已入库 {readyCount} 份
           </span>
         </div>
 
         {isLoading ? (
-          <div className="py-8 text-center text-slate-500">加载中...</div>
+          <div className="py-8 text-center text-text-secondary">加载中...</div>
         ) : customDocs.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 border-2 border-dashed rounded-2xl">
+          <div className="py-8 text-center text-text-secondary border-2 border-dashed rounded-2xl">
             暂无自定义资料，点击右上角上传教学文档。
           </div>
         ) : (
@@ -284,24 +284,24 @@ export function KnowledgeBase() {
               const isProcessing = status === "uploaded" || status === "indexing";
 
               return (
-                <div key={doc.id} className="p-4 border border-slate-100 rounded-2xl bg-slate-50 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-slate-500" />
+                <div key={doc.id} className="p-4 border border-border rounded-2xl bg-surface-muted flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-surface border border-border-strong flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-text-secondary" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{doc.filename}</p>
-                    <p className="text-xs text-slate-500">上传时间：{new Date(doc.upload_date).toLocaleString()}</p>
-                    {doc.error_msg && <p className="text-xs text-red-500 mt-1">错误：{doc.error_msg}</p>}
+                    <p className="text-xs text-text-secondary">上传时间：{new Date(doc.upload_date).toLocaleString()}</p>
+                    {doc.error_msg && <p className="text-xs text-danger mt-1">错误：{doc.error_msg}</p>}
                   </div>
                   <div className="text-xs font-semibold">
-                    {isReady && <span className="text-emerald-600">{statusLabel}</span>}
-                    {isFailed && <span className="text-red-500">{statusLabel}</span>}
-                    {isProcessing && <span className="text-amber-600">{statusLabel}</span>}
+                    {isReady && <span className="text-success">{statusLabel}</span>}
+                    {isFailed && <span className="text-danger">{statusLabel}</span>}
+                    {isProcessing && <span className="text-warning">{statusLabel}</span>}
                   </div>
                   <button
                     onClick={() => handleDelete(doc)}
                     disabled={deletingId === doc.id}
-                    className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60"
+                    className="p-2 rounded-lg border border-danger/25 text-danger hover:bg-danger-soft disabled:opacity-60"
                     title="删除文档"
                   >
                     {deletingId === doc.id ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
@@ -313,13 +313,13 @@ export function KnowledgeBase() {
         )}
 
         {processingCount > 0 && (
-          <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700 flex items-center gap-2">
+          <div className="mt-4 bg-warning-soft border border-warning/20 rounded-xl p-3 text-xs text-warning flex items-center gap-2">
             <LoaderCircle className="w-4 h-4 animate-spin" /> {processingCount} 份文档处理中，页面每 3 秒自动刷新一次。
           </div>
         )}
 
         {builtInDocs.length > 0 && (
-          <div className="mt-4 text-xs text-slate-400 flex items-center gap-2">
+          <div className="mt-4 text-xs text-text-muted flex items-center gap-2">
             <Layers className="w-3.5 h-3.5" />
             系统内置文档已聚合为 chunks 概览展示，不在此处逐条列出（共隐藏 {builtInDocs.length} 份）。
           </div>

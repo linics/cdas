@@ -129,10 +129,10 @@ export function StudentDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <section className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-3xl p-8 text-white">
-        <h1 className="text-3xl font-black mb-2">{user.name}，欢迎回来</h1>
-        <p className="text-indigo-100">
-          当前可查看 <span className="font-bold text-white">{assignments.length}</span> 个已发布跨学科作业。
+      <section className="rounded-2xl border border-secondary bg-secondary p-8">
+        <h1 className="text-3xl font-black text-text mb-2">{user.name}，欢迎回来</h1>
+        <p className="text-text-secondary">
+          当前可查看 <span className="font-bold text-primary">{assignments.length}</span> 个已发布跨学科作业。
         </p>
       </section>
 
@@ -140,60 +140,60 @@ export function StudentDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <div className="bg-surface rounded-2xl border border-border p-6">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-indigo-600" /> 我的跨学科作业
+              <BookOpen className="w-5 h-5 text-primary" /> 我的跨学科作业
             </h2>
 
-            {isLoading && <p className="text-sm text-slate-500">加载中...</p>}
+            {isLoading && <p className="text-sm text-text-secondary">加载中...</p>}
             {!isLoading && error && (
               <StatusBanner tone="error" message={error} actionLabel="重试加载" onAction={retryLoad} />
             )}
 
             <div className="space-y-4">
               {!isLoading && !error && assignments.length === 0 && (
-                <p className="text-sm text-slate-500">当前没有可见作业，请联系老师发布后再查看。</p>
+                <p className="text-sm text-text-secondary">当前没有可见作业，请联系老师发布后再查看。</p>
               )}
 
               {assignments.map((assignment) => (
                 <div
                   key={assignment.id}
-                  className="bg-slate-50 border border-slate-100 rounded-2xl p-5 hover:border-indigo-100 transition-all"
+                  className="bg-surface-muted border border-border rounded-2xl p-5 hover:border-secondary transition-all"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">
-                        <Link to={`/assignment/${assignment.id}`} className="hover:text-indigo-600 transition-colors">
+                      <h3 className="text-lg font-bold text-text">
+                        <Link to={`/assignment/${assignment.id}`} className="hover:text-primary transition-colors">
                           {assignment.title}
                         </Link>
                       </h3>
-                      <p className="text-xs text-slate-500 mt-1">
+                      <p className="text-xs text-text-secondary mt-1">
                         学段：{stageToSchoolLevel(assignment.school_stage)} · 年级：{gradeLabel(assignment.grade)} · 主学科：
                         {subjectById.get(assignment.main_subject_id) || "未匹配学科"}
                       </p>
                     </div>
-                    <span className="px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                    <span className="px-2 py-1 rounded-full bg-success-soft text-success text-[10px] font-bold">
                       已发布
                     </span>
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                    <div className="p-2 bg-white rounded-lg border border-slate-100">
+                    <div className="p-2 bg-surface rounded-lg border border-border">
                       融合学科：
                       {assignment.related_subject_ids
                         .map((subjectId) => subjectById.get(subjectId) || `学科${subjectId}`)
                         .join("、") || "暂无"}
                     </div>
-                    <div className="p-2 bg-white rounded-lg border border-slate-100">探究深度：{inquiryDepthLabel(assignment.inquiry_depth)}</div>
+                    <div className="p-2 bg-surface rounded-lg border border-border">探究深度：{inquiryDepthLabel(assignment.inquiry_depth)}</div>
                   </div>
 
                   <div className="mt-4 flex items-center justify-between">
-                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                    <div className="text-xs text-text-secondary flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" /> 创建于 {assignment.created_at.slice(0, 10)}
                     </div>
                     <Link
                       to={`/assignment/${assignment.id}`}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+                      className="text-xs font-bold text-primary hover:text-primary flex items-center gap-1"
                     >
                       进入任务 <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
@@ -205,40 +205,40 @@ export function StudentDashboard() {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <div className="bg-surface rounded-2xl border border-border p-6">
             <h3 className="font-bold mb-4 flex items-center gap-2">
-              <Users className="w-5 h-5 text-indigo-600" /> 班级邀请码能力
+              <Users className="w-5 h-5 text-primary" /> 班级邀请码能力
             </h3>
-            <p className="text-sm text-slate-600 leading-relaxed">输入教师提供的邀请码即可入班。</p>
+            <p className="text-sm text-text-secondary leading-relaxed">输入教师提供的邀请码即可入班。</p>
             <div className="mt-4 flex items-center gap-2">
               <input
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="请输入邀请码"
-                className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                className="flex-1 px-3 py-2 rounded-lg border border-border-strong bg-surface text-sm"
               />
               <button
                 onClick={joinClassroom}
                 disabled={joining}
-                className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60"
               >
                 {joining ? "加入中..." : "加入班级"}
               </button>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <div className="bg-surface rounded-2xl border border-border p-6">
             <h3 className="font-bold mb-4 flex items-center gap-2">
-              <LayoutGrid className="w-5 h-5 text-indigo-600" /> 我的班级与小组
+              <LayoutGrid className="w-5 h-5 text-primary" /> 我的班级与小组
             </h3>
             {classes.length === 0 ? (
-              <p className="text-sm text-slate-500">你暂未加入任何班级。</p>
+              <p className="text-sm text-text-secondary">你暂未加入任何班级。</p>
             ) : (
               <div className="space-y-2">
                 {classes.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                    <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">
+                  <div key={item.id} className="rounded-xl border border-border-strong bg-surface-muted px-3 py-2">
+                    <p className="text-sm font-semibold text-text">{item.name}</p>
+                    <p className="text-xs text-text-secondary mt-1">
                       {gradeLabel(item.grade)} · 教师：{item.teacher_name || "未显示"} · 成员 {item.member_count} 人 · 小组：
                       {item.joined_group_name || "未分组"}
                     </p>
@@ -248,14 +248,14 @@ export function StudentDashboard() {
             )}
           </div>
 
-          <div className="bg-amber-50 rounded-3xl border border-amber-100 p-6">
-            <h4 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
+          <div className="bg-warning-soft rounded-2xl border border-warning/20 p-6">
+            <h4 className="font-bold text-warning mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4" /> 学习建议
             </h4>
-            <p className="text-xs text-amber-700 leading-relaxed">
+            <p className="text-xs text-warning leading-relaxed">
               建议优先完成“证据采集”与“数据解释”两类步骤，这会直接影响你的作业评价质量。
             </p>
-            <div className="mt-4 flex items-center gap-1 text-emerald-600 text-xs font-semibold">
+            <div className="mt-4 flex items-center gap-1 text-success text-xs font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" /> 按阶段提交，持续完善证据链
             </div>
           </div>

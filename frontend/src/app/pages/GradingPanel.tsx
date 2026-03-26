@@ -388,15 +388,15 @@ export function GradingPanel() {
 
   return (
     <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[2fr,1fr] gap-6">
-      <section className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <section className="bg-surface rounded-2xl border border-border p-6 space-y-4">
         <div>
           <h1 className="text-2xl font-bold">{assignment.title}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-text-secondary mt-1">
             学生 ID：{submission.student_id} · 阶段：{submission.phase_index + 1} · 状态：
             {submissionStatusLabel(submission.status)}
           </p>
           {submission.group_name && (
-            <p className="text-xs text-indigo-600 mt-1">
+            <p className="text-xs text-primary mt-1">
               小组提交：{submission.group_name}
               {submission.group_members?.length
                 ? `（${submission.group_members.map((member) => member.name || member.username || `ID:${member.user_id}`).join("、")}）`
@@ -405,19 +405,19 @@ export function GradingPanel() {
           )}
           <Link
             to={`/assignment/${assignment.id}`}
-            className="inline-flex mt-2 text-xs font-semibold text-indigo-600 hover:underline"
+            className="inline-flex mt-2 text-xs font-semibold text-primary hover:underline"
           >
             返回作业提交
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+        <div className="rounded-2xl border border-border-strong bg-surface-muted p-4 space-y-3">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-700">小组聚合视图</h2>
+            <h2 className="text-sm font-semibold text-text">小组聚合视图</h2>
             <select
               value={groupViewFilter}
               onChange={(e) => setGroupViewFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-xs"
+              className="px-3 py-2 rounded-lg border border-border-strong text-xs"
             >
               <option value="all">全部小组/个人</option>
               <option value="ungrouped">仅个人提交</option>
@@ -430,52 +430,52 @@ export function GradingPanel() {
           </div>
 
           {filteredGroupAggregateRows.length === 0 ? (
-            <p className="text-xs text-slate-500">当前筛选下暂无提交记录。</p>
+            <p className="text-xs text-text-secondary">当前筛选下暂无提交记录。</p>
           ) : (
             <div className="space-y-2">
-              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
-                <p className="text-xs font-semibold text-slate-700">组内评分分布小结</p>
+              <div className="bg-surface border border-border-strong rounded-lg p-3 space-y-2">
+                <p className="text-xs font-semibold text-text">组内评分分布小结</p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                  <div className="rounded-md bg-slate-50 border border-slate-200 px-2 py-1.5">
-                    <p className="text-slate-500">聚合单元</p>
-                    <p className="font-semibold text-slate-800 mt-0.5">{groupScoreSummary.totalBuckets}</p>
+                  <div className="rounded-md bg-surface-muted border border-border-strong px-2 py-1.5">
+                    <p className="text-text-secondary">聚合单元</p>
+                    <p className="font-semibold text-text mt-0.5">{groupScoreSummary.totalBuckets}</p>
                   </div>
-                  <div className="rounded-md bg-slate-50 border border-slate-200 px-2 py-1.5">
-                    <p className="text-slate-500">高风险组</p>
-                    <p className="font-semibold text-red-700 mt-0.5">{groupScoreSummary.highRiskBuckets}</p>
+                  <div className="rounded-md bg-surface-muted border border-border-strong px-2 py-1.5">
+                    <p className="text-text-secondary">高风险组</p>
+                    <p className="font-semibold text-danger mt-0.5">{groupScoreSummary.highRiskBuckets}</p>
                   </div>
-                  <div className="rounded-md bg-slate-50 border border-slate-200 px-2 py-1.5">
-                    <p className="text-slate-500">待评分</p>
-                    <p className="font-semibold text-indigo-700 mt-0.5">
+                  <div className="rounded-md bg-surface-muted border border-border-strong px-2 py-1.5">
+                    <p className="text-text-secondary">待评分</p>
+                    <p className="font-semibold text-primary mt-0.5">
                       {groupScoreSummary.submitted}（{groupScoreSummary.pendingRate}%）
                     </p>
                   </div>
-                  <div className="rounded-md bg-slate-50 border border-slate-200 px-2 py-1.5">
-                    <p className="text-slate-500">已评分</p>
-                    <p className="font-semibold text-emerald-700 mt-0.5">
+                  <div className="rounded-md bg-surface-muted border border-border-strong px-2 py-1.5">
+                    <p className="text-text-secondary">已评分</p>
+                    <p className="font-semibold text-success mt-0.5">
                       {groupScoreSummary.graded}（{groupScoreSummary.gradedRate}%）
                     </p>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-text-secondary">
                   总提交 {groupScoreSummary.totalSubmissions} 次，草稿 {groupScoreSummary.draft} 次。
                 </p>
               </div>
 
               {filteredGroupAggregateRows.map((item) => (
-                <div key={item.key} className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+                <div key={item.key} className="bg-surface border border-border-strong rounded-lg px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
+                    <p className="text-sm font-semibold text-text">{item.label}</p>
                     <div className="flex items-center gap-2">
                       <span
                         className={`text-[11px] px-2 py-0.5 rounded-full ${
                           item.riskScore >= 3
-                            ? "bg-red-100 text-red-700"
+                            ? "bg-danger-soft text-danger"
                             : item.riskScore >= 2
-                              ? "bg-amber-100 text-amber-700"
+                              ? "bg-warning-soft text-warning"
                               : item.riskScore >= 1
-                                ? "bg-indigo-100 text-indigo-700"
-                                : "bg-emerald-100 text-emerald-700"
+                                ? "bg-secondary text-primary"
+                                : "bg-success-soft text-success"
                         }`}
                       >
                         {item.riskText}
@@ -483,19 +483,19 @@ export function GradingPanel() {
                       {item.latestSubmission ? (
                         <Link
                           to={`/grading/${item.latestSubmission.id}`}
-                          className="text-xs font-semibold text-indigo-600 hover:underline"
+                          className="text-xs font-semibold text-primary hover:underline"
                         >
                           {item.latestSubmission.id === submission.id ? "当前批改" : "查看最新提交"}
                         </Link>
                       ) : (
-                        <span className="text-xs text-slate-400">暂无提交</span>
+                        <span className="text-xs text-text-muted">暂无提交</span>
                       )}
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-text-secondary mt-1">
                     阶段进度 {item.phaseProgress} · 提交 {item.totalSubmissions} 次 · 待评分 {item.submittedCount} · 已评分 {item.gradedCount}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-1">
+                  <p className="text-[11px] text-text-muted mt-1">
                     最近提交：{formatDateTime(item.lastSubmittedAt)} · 最近评分：{formatDateTime(item.lastEvaluatedAt)}
                   </p>
                 </div>
@@ -504,21 +504,21 @@ export function GradingPanel() {
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <h2 className="text-sm font-semibold text-slate-700 mb-2">提交内容</h2>
-          <pre className="text-xs text-slate-700 whitespace-pre-wrap break-words">
+        <div className="rounded-2xl border border-border bg-surface-muted p-4">
+          <h2 className="text-sm font-semibold text-text mb-2">提交内容</h2>
+          <pre className="text-xs text-text whitespace-pre-wrap break-words">
             {typeof submission.content_json?.text === "string"
               ? (submission.content_json.text as string)
               : JSON.stringify(submission.content_json, null, 2)}
           </pre>
         </div>
 
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <h2 className="text-sm font-semibold text-slate-700 mb-2">附件</h2>
+        <div className="rounded-2xl border border-border bg-surface-muted p-4">
+          <h2 className="text-sm font-semibold text-text mb-2">附件</h2>
           {submission.attachments_json?.length ? (
             <ul className="space-y-2">
               {submission.attachments_json.map((attachment, index) => (
-                <li key={`${attachment.filename}_${index}`} className="text-sm text-indigo-600">
+                <li key={`${attachment.filename}_${index}`} className="text-sm text-primary">
                   <a href={attachment.url} target="_blank" rel="noreferrer" className="hover:underline">
                     {attachment.filename}
                   </a>
@@ -526,19 +526,19 @@ export function GradingPanel() {
               ))}
             </ul>
           ) : (
-            <p className="text-xs text-slate-500">暂无附件</p>
+            <p className="text-xs text-text-secondary">暂无附件</p>
           )}
         </div>
 
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-          <h2 className="text-sm font-semibold text-slate-700 mb-2">检查点完成情况</h2>
+        <div className="rounded-2xl border border-border bg-surface-muted p-4">
+          <h2 className="text-sm font-semibold text-text mb-2">检查点完成情况</h2>
           {Object.keys(submission.checkpoints_json || {}).length === 0 ? (
-            <p className="text-xs text-slate-500">暂无检查点记录</p>
+            <p className="text-xs text-text-secondary">暂无检查点记录</p>
           ) : (
             <ul className="space-y-1">
               {Object.entries(submission.checkpoints_json || {}).map(([name, value]) => (
-                <li key={name} className="text-sm text-slate-700 flex items-center gap-2">
-                  {value ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Star className="w-4 h-4 text-slate-400" />} {name}
+                <li key={name} className="text-sm text-text flex items-center gap-2">
+                  {value ? <CheckCircle2 className="w-4 h-4 text-success" /> : <Star className="w-4 h-4 text-text-muted" />} {name}
                 </li>
               ))}
             </ul>
@@ -546,13 +546,13 @@ export function GradingPanel() {
         </div>
       </section>
 
-      <aside className="bg-white rounded-3xl border border-slate-100 p-6 space-y-5">
+      <aside className="bg-surface rounded-2xl border border-border p-6 space-y-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">评分面板</h2>
           <button
             onClick={handleAiAssist}
             disabled={aiLoading}
-            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1"
+            className="px-3 py-2 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center gap-1"
           >
             {aiLoading ? <LoaderCircle className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} AI 辅助
           </button>
@@ -562,14 +562,14 @@ export function GradingPanel() {
         {error && <StatusBanner tone="error" message={error} />}
 
         <div className="space-y-4">
-          {rubricDimensions.length === 0 && <p className="text-sm text-slate-500">当前作业未配置维度量表。</p>}
+          {rubricDimensions.length === 0 && <p className="text-sm text-text-secondary">当前作业未配置维度量表。</p>}
           {rubricDimensions.map((dimensionName) => {
             const value = clampScore(dimensionScores[dimensionName] || 3);
             return (
               <div key={dimensionName} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-700">{dimensionName}</span>
-                  <span className="text-indigo-700 font-bold">
+                  <span className="font-semibold text-text">{dimensionName}</span>
+                  <span className="text-primary font-bold">
                     {value}（{SCORE_LABELS[value]}）
                   </span>
                 </div>
@@ -590,10 +590,10 @@ export function GradingPanel() {
           })}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50 space-y-2">
+        <div className="rounded-2xl border border-border-strong p-4 bg-surface-muted space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-slate-700">总评价</span>
-            <span className="font-bold text-indigo-700">
+            <span className="font-semibold text-text">总评价</span>
+            <span className="font-bold text-primary">
               {clampScore(scoreNumeric)}（{SCORE_LABELS[clampScore(scoreNumeric)]}）
             </span>
           </div>
@@ -609,12 +609,12 @@ export function GradingPanel() {
         </div>
 
         <div>
-          <label className="text-sm font-semibold text-slate-700">教师评语</label>
+          <label className="text-sm font-semibold text-text">教师评语</label>
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
             rows={6}
-            className="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 resize-none"
+            className="mt-2 w-full px-3 py-2 rounded-xl border border-border-strong resize-none"
             placeholder="请输入本阶段评价与改进建议"
           />
         </div>
@@ -622,7 +622,7 @@ export function GradingPanel() {
         <button
           onClick={handleSubmit}
           disabled={submitting}
-          className="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center justify-center gap-2"
         >
           {submitting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} 提交评分
         </button>

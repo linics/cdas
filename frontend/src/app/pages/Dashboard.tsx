@@ -89,65 +89,65 @@ export function Dashboard() {
     <div className="max-w-7xl mx-auto space-y-8">
       <section className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">欢迎回来，{user.name}</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            你当前创建了 <span className="font-bold text-indigo-600">{assignments.length}</span> 份跨学科作业。
+          <h1 className="text-3xl font-bold text-text">欢迎回来，{user.name}</h1>
+          <p className="text-sm text-text-secondary mt-1">
+            你当前创建了 <span className="font-bold text-primary">{assignments.length}</span> 份跨学科作业。
           </p>
         </div>
         <Link
           to="/create"
-          className="inline-flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700"
+          className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-hover active:bg-primary-active"
         >
           <PlusCircle className="w-5 h-5" /> 设计新作业
         </Link>
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+        <div className="bg-surface rounded-2xl border border-border p-5 space-y-2">
+          <div className="w-8 h-8 rounded-lg bg-warning-soft text-warning flex items-center justify-center">
             <FileText className="w-4 h-4" />
           </div>
-          <p className="text-xs text-slate-500">草稿作业</p>
-          <p className="text-2xl font-black text-amber-600">{draftCount}</p>
+          <p className="text-xs text-text-secondary">草稿作业</p>
+          <p className="text-2xl font-black text-warning">{draftCount}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+        <div className="bg-surface rounded-2xl border border-border p-5 space-y-2">
+          <div className="w-8 h-8 rounded-lg bg-success-soft text-success flex items-center justify-center">
             <CheckCircle2 className="w-4 h-4" />
           </div>
-          <p className="text-xs text-slate-500">已发布作业</p>
-          <p className="text-2xl font-black text-emerald-600">{publishedCount}</p>
+          <p className="text-xs text-text-secondary">已发布作业</p>
+          <p className="text-2xl font-black text-success">{publishedCount}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+        <div className="bg-surface rounded-2xl border border-border p-5 space-y-2">
+          <div className="w-8 h-8 rounded-lg bg-secondary text-text-secondary flex items-center justify-center">
             <Archive className="w-4 h-4" />
           </div>
-          <p className="text-xs text-slate-500">已归档作业</p>
-          <p className="text-2xl font-black text-slate-700">{archivedCount}</p>
+          <p className="text-xs text-text-secondary">已归档作业</p>
+          <p className="text-2xl font-black text-text">{archivedCount}</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-100 p-5 space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+        <div className="bg-surface rounded-2xl border border-border p-5 space-y-2">
+          <div className="w-8 h-8 rounded-lg bg-secondary text-primary flex items-center justify-center">
             <Users className="w-4 h-4" />
           </div>
-          <p className="text-xs text-slate-500">班级管理</p>
-          <p className="text-base font-black text-indigo-700">已接入</p>
-          <p className="text-[11px] text-slate-400">支持创建班级、发放邀请码、入班与班级分组</p>
+          <p className="text-xs text-text-secondary">班级管理</p>
+          <p className="text-base font-black text-primary">已接入</p>
+          <p className="text-[11px] text-text-muted">支持创建班级、发放邀请码、入班与班级分组</p>
         </div>
       </section>
 
-      <section className="bg-white rounded-3xl border border-slate-100 p-6">
+      <section className="bg-surface rounded-2xl border border-border p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">最近更新的作业</h2>
-          <Link to="/create" className="text-sm font-semibold text-indigo-600 hover:underline">
+          <Link to="/create" className="text-sm font-semibold text-primary hover:underline">
             进入设计器
           </Link>
         </div>
 
-        {isLoading && <p className="text-sm text-slate-500">加载中...</p>}
+        {isLoading && <p className="text-sm text-text-secondary">加载中...</p>}
         {!isLoading && error && (
           <StatusBanner tone="error" message={error} actionLabel="重试加载" onAction={retryLoad} />
         )}
         {!isLoading && !error && latest.length === 0 && (
-          <p className="text-sm text-slate-500">暂无作业，请先创建。</p>
+          <p className="text-sm text-text-secondary">暂无作业，请先创建。</p>
         )}
 
         <div className="space-y-3">
@@ -156,28 +156,28 @@ export function Dashboard() {
             return (
               <div
                 key={assignment.id}
-                className="p-4 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-between gap-4"
+                className="p-4 bg-surface-muted border border-border rounded-xl flex items-center justify-between gap-4"
               >
                 <div>
                   <p className="font-semibold">{assignment.title}</p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-text-secondary mt-1">
                     {stageToSchoolLevel(assignment.school_stage)} · {gradeLabel(assignment.grade)} · 主学科：
                     {mainSubjectName}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+                  <span className="px-2 py-1 rounded-full bg-secondary text-text">
                     {assignment.is_archived ? "已归档" : assignment.is_published ? "已发布" : "草稿"}
                   </span>
                   <Link
                     to={`/assignment/${assignment.id}`}
-                    className="text-slate-600 font-semibold hover:underline"
+                    className="text-text-secondary font-semibold hover:underline"
                   >
                     查看提交
                   </Link>
                   <Link
                     to={`/create?edit=${assignment.id}`}
-                    className="text-indigo-600 font-semibold hover:underline"
+                    className="text-primary font-semibold hover:underline"
                   >
                     编辑
                   </Link>
@@ -189,17 +189,17 @@ export function Dashboard() {
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
-          <p className="text-sm font-bold text-indigo-800 mb-2">发布建议</p>
-          <p className="text-xs text-indigo-700">发布前建议先点击 AI 预览，确认任务流程与评价维度完整。</p>
+        <div className="bg-secondary border border-secondary rounded-2xl p-5">
+          <p className="text-sm font-bold text-primary mb-2">发布建议</p>
+          <p className="text-xs text-primary">发布前建议先点击 AI 预览，确认任务流程与评价维度完整。</p>
         </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
-          <p className="text-sm font-bold text-emerald-800 mb-2">知识库增强</p>
-          <p className="text-xs text-emerald-700">可先在知识库上传教学资料，再用于作业设计时的 AI 生成。</p>
+        <div className="bg-success-soft border border-success/20 rounded-2xl p-5">
+          <p className="text-sm font-bold text-success mb-2">知识库增强</p>
+          <p className="text-xs text-success">可先在知识库上传教学资料，再用于作业设计时的 AI 生成。</p>
         </div>
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
-          <p className="text-sm font-bold text-amber-800 mb-2">班级功能进展</p>
-          <p className="text-xs text-amber-700 flex items-center gap-1">
+        <div className="bg-warning-soft border border-warning/20 rounded-2xl p-5">
+          <p className="text-sm font-bold text-warning mb-2">班级功能进展</p>
+          <p className="text-xs text-warning flex items-center gap-1">
             <Archive className="w-3.5 h-3.5" /> 班级邀请码与基础分组能力已接入，可直接完成班级内分组。
           </p>
         </div>
