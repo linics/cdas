@@ -16,40 +16,40 @@ interface PageStateProps {
 function variantStyle(variant: PageStateVariant) {
   if (variant === "error") {
     return {
-      wrapper: "border-red-100 bg-red-50",
-      iconWrapper: "bg-red-100 text-red-600",
+      wrapper: "border-danger/20 bg-danger-soft",
+      iconWrapper: "bg-surface text-danger",
       icon: AlertCircle,
-      title: "text-red-700",
-      desc: "text-red-600",
+      title: "text-danger",
+      desc: "text-danger",
     };
   }
 
   if (variant === "warning") {
     return {
-      wrapper: "border-amber-100 bg-amber-50",
-      iconWrapper: "bg-amber-100 text-amber-700",
+      wrapper: "border-warning/20 bg-warning-soft",
+      iconWrapper: "bg-surface text-warning",
       icon: ShieldAlert,
-      title: "text-amber-800",
-      desc: "text-amber-700",
+      title: "text-warning",
+      desc: "text-warning",
     };
   }
 
   if (variant === "loading") {
     return {
-      wrapper: "border-slate-100 bg-white",
-      iconWrapper: "bg-slate-100 text-slate-600",
+      wrapper: "border-border bg-surface",
+      iconWrapper: "bg-surface-muted text-text-secondary",
       icon: LoaderCircle,
-      title: "text-slate-800",
-      desc: "text-slate-500",
+      title: "text-text",
+      desc: "text-text-secondary",
     };
   }
 
   return {
-    wrapper: "border-slate-100 bg-white",
-    iconWrapper: "bg-indigo-100 text-indigo-600",
+    wrapper: "border-border bg-surface",
+    iconWrapper: "bg-info-soft text-info",
     icon: Info,
-    title: "text-slate-800",
-    desc: "text-slate-500",
+    title: "text-text",
+    desc: "text-text-secondary",
   };
 }
 
@@ -65,7 +65,7 @@ export function PageState({
   const Icon = style.icon;
 
   return (
-    <div className={`max-w-4xl mx-auto border rounded-3xl p-8 text-center ${style.wrapper}`}>
+    <div className={`max-w-4xl mx-auto border rounded-2xl p-8 text-center ${style.wrapper}`}>
       <div className={`mx-auto w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${style.iconWrapper}`}>
         <Icon className={`w-5 h-5 ${variant === "loading" ? "animate-spin" : ""}`} />
       </div>
@@ -75,7 +75,7 @@ export function PageState({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="mt-5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+          className="mt-5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover active:bg-primary-active"
         >
           {actionLabel}
         </button>
@@ -84,7 +84,7 @@ export function PageState({
       {actionLabel && actionTo && (
         <Link
           to={actionTo}
-          className="inline-flex mt-5 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
+          className="inline-flex mt-5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover active:bg-primary-active"
         >
           {actionLabel}
         </Link>

@@ -281,12 +281,12 @@ export function TeacherClassManager() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <section className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+      <section className="bg-surface rounded-2xl border border-border p-6 space-y-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Users className="w-6 h-6 text-indigo-600" /> 班级与小组管理
+            <Users className="w-6 h-6 text-primary" /> 班级与小组管理
           </h1>
-          <p className="text-sm text-slate-500 mt-1">教师可创建班级、分发邀请码，并完成班级内小组创建与成员分配。</p>
+          <p className="text-sm text-text-secondary mt-1">教师可创建班级、分发邀请码，并完成班级内小组创建与成员分配。</p>
         </div>
 
         {error && <StatusBanner tone="error" message={error} actionLabel="刷新" onAction={loadClasses} />}
@@ -297,12 +297,12 @@ export function TeacherClassManager() {
             value={className}
             onChange={(e) => setClassName(e.target.value)}
             placeholder="输入班级名称，例如：初一(3)班"
-            className="px-4 py-3 rounded-xl border border-slate-200"
+            className="px-4 py-3 rounded-xl border border-border-strong"
           />
           <select
             value={classGrade}
             onChange={(e) => setClassGrade(Number(e.target.value))}
-            className="px-4 py-3 rounded-xl border border-slate-200"
+            className="px-4 py-3 rounded-xl border border-border-strong"
           >
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((grade) => (
               <option key={grade} value={grade}>
@@ -313,7 +313,7 @@ export function TeacherClassManager() {
           <button
             onClick={createClassroom}
             disabled={creating}
-            className="px-4 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center justify-center gap-2"
+            className="px-4 py-3 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {creating ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />} 创建班级
           </button>
@@ -321,10 +321,10 @@ export function TeacherClassManager() {
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.2fr,1.8fr] gap-6">
-        <article className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3">
+        <article className="bg-surface rounded-2xl border border-border p-5 space-y-3">
           <h2 className="font-bold text-lg">我的班级</h2>
           {classes.length === 0 ? (
-            <p className="text-sm text-slate-500">暂无班级，请先创建一个班级。</p>
+            <p className="text-sm text-text-secondary">暂无班级，请先创建一个班级。</p>
           ) : (
             <div className="space-y-2">
               {classes.map((item) => (
@@ -333,12 +333,12 @@ export function TeacherClassManager() {
                   onClick={() => setSelectedClassId(item.id)}
                   className={`w-full text-left rounded-xl border p-3 transition-colors ${
                     selectedClassId === item.id
-                      ? "border-indigo-300 bg-indigo-50"
-                      : "border-slate-200 bg-white hover:bg-slate-50"
+                      ? "border-secondary bg-secondary"
+                      : "border-border-strong bg-surface hover:bg-surface-muted"
                   }`}
                 >
-                  <p className="text-sm font-semibold text-slate-800">{item.name}</p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-sm font-semibold text-text">{item.name}</p>
+                  <p className="text-xs text-text-secondary mt-1">
                     {gradeLabel(item.grade)} · 成员 {item.member_count} 人
                   </p>
                 </button>
@@ -347,54 +347,54 @@ export function TeacherClassManager() {
           )}
         </article>
 
-        <article className="bg-white rounded-3xl border border-slate-100 p-5 space-y-4">
+        <article className="bg-surface rounded-2xl border border-border p-5 space-y-4">
           {!selectedClassroom ? (
-            <p className="text-sm text-slate-500">请选择左侧班级查看详情。</p>
+            <p className="text-sm text-text-secondary">请选择左侧班级查看详情。</p>
           ) : (
             <>
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <h2 className="font-bold text-lg">{selectedClassroom.name}</h2>
-                  <p className="text-xs text-slate-500">{gradeLabel(selectedClassroom.grade)} · 当前成员 {selectedClassroom.member_count} 人</p>
+                  <p className="text-xs text-text-secondary">{gradeLabel(selectedClassroom.grade)} · 当前成员 {selectedClassroom.member_count} 人</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={copyInviteCode}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 flex items-center gap-1"
+                    className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted flex items-center gap-1"
                   >
                     <Copy className="w-4 h-4" /> 复制邀请码
                   </button>
                   <button
                     onClick={resetInviteCode}
                     disabled={resetting}
-                    className="px-3 py-2 rounded-lg border border-amber-200 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-60 flex items-center gap-1"
+                    className="px-3 py-2 rounded-lg border border-warning/25 text-warning text-sm font-semibold hover:bg-warning-soft disabled:opacity-60 flex items-center gap-1"
                   >
                     {resetting ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} 重置邀请码
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
-                <p className="text-xs text-indigo-700 mb-1 flex items-center gap-1">
+              <div className="rounded-2xl border border-secondary bg-secondary p-4">
+                <p className="text-xs text-primary mb-1 flex items-center gap-1">
                   <KeyRound className="w-3.5 h-3.5" /> 当前邀请码
                 </p>
-                <p className="text-2xl font-black tracking-[0.2em] text-indigo-700">{selectedClassroom.invite_code}</p>
+                <p className="text-2xl font-black tracking-[0.2em] text-primary">{selectedClassroom.invite_code}</p>
               </div>
 
               <div className="space-y-3">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <h3 className="text-sm font-bold text-slate-700">班级小组</h3>
+                  <h3 className="text-sm font-bold text-text">班级小组</h3>
                   <div className="flex items-center gap-2">
                     <input
                       value={groupName}
                       onChange={(e) => setGroupName(e.target.value)}
                       placeholder="输入小组名称，例如：第1组"
-                      className="px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                      className="px-3 py-2 rounded-lg border border-border-strong text-sm"
                     />
                     <button
                       onClick={createGroup}
                       disabled={creatingGroup}
-                      className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                      className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60"
                     >
                       {creatingGroup ? "创建中..." : "创建小组"}
                     </button>
@@ -402,27 +402,27 @@ export function TeacherClassManager() {
                 </div>
 
                 {groupsLoading ? (
-                  <p className="text-sm text-slate-500 flex items-center gap-2">
+                  <p className="text-sm text-text-secondary flex items-center gap-2">
                     <LoaderCircle className="w-4 h-4 animate-spin" /> 加载小组中...
                   </p>
                 ) : groups.length === 0 ? (
-                  <p className="text-sm text-slate-500">暂无小组，可先创建小组后再分配成员。</p>
+                  <p className="text-sm text-text-secondary">暂无小组，可先创建小组后再分配成员。</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {groups.map((group) => (
-                      <div key={group.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div key={group.id} className="rounded-xl border border-border-strong bg-surface-muted px-3 py-2">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-slate-800">{group.name}</p>
+                          <p className="text-sm font-semibold text-text">{group.name}</p>
                           <button
                             onClick={() => deleteGroup(group)}
                             disabled={deletingGroupId === group.id}
-                            className="text-xs px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-60 flex items-center gap-1"
+                            className="text-xs px-2 py-1 rounded-md border border-danger/25 text-danger hover:bg-danger-soft disabled:opacity-60 flex items-center gap-1"
                           >
                             {deletingGroupId === group.id ? <LoaderCircle className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />} 删除
                           </button>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">成员 {group.member_count} 人</p>
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-text-secondary mt-1">成员 {group.member_count} 人</p>
+                        <p className="text-xs text-text-secondary mt-1">
                           {(group.members || []).map((member) => member.student_name).join("、") || "暂无成员"}
                         </p>
                       </div>
@@ -432,21 +432,21 @@ export function TeacherClassManager() {
               </div>
 
               <div>
-                <h3 className="text-sm font-bold text-slate-700 mb-2">入班学生与分组</h3>
+                <h3 className="text-sm font-bold text-text mb-2">入班学生与分组</h3>
                 {membersLoading ? (
-                  <p className="text-sm text-slate-500 flex items-center gap-2">
+                  <p className="text-sm text-text-secondary flex items-center gap-2">
                     <LoaderCircle className="w-4 h-4 animate-spin" /> 加载成员中...
                   </p>
                 ) : members.length === 0 ? (
-                  <p className="text-sm text-slate-500">暂无学生入班，可将邀请码发给学生加入。</p>
+                  <p className="text-sm text-text-secondary">暂无学生入班，可将邀请码发给学生加入。</p>
                 ) : (
                   <div className="space-y-2">
                     {members.map((member) => (
-                      <div key={member.member_id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div key={member.member_id} className="rounded-xl border border-border-strong bg-surface-muted px-3 py-2">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                           <div>
-                            <p className="text-sm font-semibold text-slate-800">{member.student_name}</p>
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-sm font-semibold text-text">{member.student_name}</p>
+                            <p className="text-xs text-text-secondary mt-1">
                               学号：{member.student_username} · 年级：{member.student_grade ? gradeLabel(member.student_grade) : "未设置"}
                             </p>
                           </div>
@@ -455,7 +455,7 @@ export function TeacherClassManager() {
                               value={member.group_id ? String(member.group_id) : ""}
                               onChange={(e) => changeStudentGroup(member, e.target.value)}
                               disabled={updatingStudentId === member.student_id}
-                              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm"
+                              className="w-full px-3 py-2 rounded-lg border border-border-strong text-sm"
                             >
                               <option value="">未分组</option>
                               {groups.map((group) => (
@@ -466,7 +466,7 @@ export function TeacherClassManager() {
                             </select>
                           </div>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">当前小组：{member.group_name || "未分组"}</p>
+                        <p className="text-[11px] text-text-secondary mt-1">当前小组：{member.group_name || "未分组"}</p>
                       </div>
                     ))}
                   </div>
@@ -477,7 +477,7 @@ export function TeacherClassManager() {
         </article>
       </section>
 
-      <section className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-xs text-emerald-800 flex items-center gap-2">
+      <section className="bg-success-soft border border-success/20 rounded-2xl p-4 text-xs text-success flex items-center gap-2">
         <CheckCircle2 className="w-4 h-4" />
         班级与小组能力已接入：支持邀请码入班、小组创建、成员分配与分组调整。
       </section>

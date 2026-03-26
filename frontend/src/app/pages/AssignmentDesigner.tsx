@@ -886,17 +886,17 @@ export function AssignmentDesigner() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
-      <section className="bg-white rounded-3xl border border-slate-100 p-6">
+      <section className="bg-surface rounded-2xl border border-border p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">跨学科作业设计工坊</h1>
-            <p className="text-sm text-slate-500 mt-1">已接入真实后端，支持 AI 预览、保存、发布与历史管理。</p>
+            <p className="text-sm text-text-secondary mt-1">已接入真实后端，支持 AI 预览、保存、发布与历史管理。</p>
           </div>
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+          <div className="flex items-center gap-2 bg-secondary p-1 rounded-xl">
             <button
               onClick={() => setTab("editor")}
               className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                tab === "editor" ? "bg-white text-indigo-700" : "text-slate-500"
+                tab === "editor" ? "bg-surface text-primary" : "text-text-secondary"
               }`}
             >
               设计编辑
@@ -904,7 +904,7 @@ export function AssignmentDesigner() {
             <button
               onClick={() => setTab("history")}
               className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                tab === "history" ? "bg-white text-indigo-700" : "text-slate-500"
+                tab === "history" ? "bg-surface text-primary" : "text-text-secondary"
               }`}
             >
               历史记录
@@ -922,18 +922,18 @@ export function AssignmentDesigner() {
             <h2 className="text-xl font-bold">历史作业</h2>
             <button
               onClick={resetEditor}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold"
+              className="px-4 py-2 bg-primary hover:bg-primary-hover active:bg-primary-active text-white rounded-xl text-sm font-bold"
             >
               新建设计
             </button>
           </div>
 
           {sortedAssignments.length === 0 && (
-            <div className="bg-white rounded-2xl border border-slate-100 p-8 text-slate-500">暂无历史作业。</div>
+            <div className="bg-surface rounded-2xl border border-border p-8 text-text-secondary">暂无历史作业。</div>
           )}
 
           {sortedAssignments.map((assignment) => (
-            <article key={assignment.id} className="bg-white rounded-2xl border border-slate-100 p-6">
+            <article key={assignment.id} className="bg-surface rounded-2xl border border-border p-6">
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -941,31 +941,31 @@ export function AssignmentDesigner() {
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         assignment.is_archived
-                          ? "bg-slate-100 text-slate-700"
+                          ? "bg-secondary text-text"
                           : assignment.is_published
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
+                          ? "bg-success-soft text-success"
+                          : "bg-warning-soft text-warning"
                       }`}
                     >
                       {toAssignmentStatusText(assignment)}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-text-secondary">
                     {scoreStageLabel(assignment.school_stage)} · {gradeLabelByStage(assignment.school_stage, assignment.grade)} · 主题：{assignment.topic}
                   </p>
-                  <p className="text-xs text-slate-400 mt-1">创建时间：{assignment.created_at.slice(0, 19).replace("T", " ")}</p>
+                  <p className="text-xs text-text-muted mt-1">创建时间：{assignment.created_at.slice(0, 19).replace("T", " ")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={() => loadForEdit(assignment)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50"
+                    className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted"
                   >
                     编辑
                   </button>
                   {!assignment.is_published && !assignment.is_archived && (
                     <button
                       onClick={() => publishFromHistory(assignment.id)}
-                      className="px-3 py-2 rounded-lg border border-emerald-200 text-emerald-700 text-sm font-semibold hover:bg-emerald-50"
+                      className="px-3 py-2 rounded-lg border border-success/25 text-success text-sm font-semibold hover:bg-success-soft"
                     >
                       发布
                     </button>
@@ -973,27 +973,27 @@ export function AssignmentDesigner() {
                   {!assignment.is_archived ? (
                     <button
                       onClick={() => archiveFromHistory(assignment.id)}
-                      className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+                      className="px-3 py-2 rounded-lg border border-border-strong text-text text-sm font-semibold hover:bg-surface-muted"
                     >
                       归档
                     </button>
                   ) : (
                     <button
                       onClick={() => unarchiveFromHistory(assignment.id)}
-                      className="px-3 py-2 rounded-lg border border-indigo-200 text-indigo-700 text-sm font-semibold hover:bg-indigo-50"
+                      className="px-3 py-2 rounded-lg border border-secondary text-primary text-sm font-semibold hover:bg-secondary"
                     >
                       取消归档
                     </button>
                   )}
                   <button
                     onClick={() => deleteAssignment(assignment)}
-                    className="px-3 py-2 rounded-lg border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50"
+                    className="px-3 py-2 rounded-lg border border-danger/25 text-danger text-sm font-semibold hover:bg-danger-soft"
                   >
                     删除
                   </button>
                   <Link
                     to={`/assignment/${assignment.id}`}
-                    className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50"
+                    className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted"
                   >
                     查看详情
                   </Link>
@@ -1004,12 +1004,12 @@ export function AssignmentDesigner() {
         </section>
       ) : (
         <section className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-border p-6 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold">基本信息</h2>
               <button
                 onClick={resetEditor}
-                className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50"
+                className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted"
               >
                 清空重置
               </button>
@@ -1017,54 +1017,54 @@ export function AssignmentDesigner() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700">作业标题 *</label>
+                <label className="text-sm font-semibold text-text">作业标题 *</label>
                 <input
                   value={form.title}
                   onChange={(e) => updateForm("title", e.target.value)}
                   placeholder="例如：家乡水质探究"
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">探究主题 *</label>
+                <label className="text-sm font-semibold text-text">探究主题 *</label>
                 <input
                   value={form.topic}
                   onChange={(e) => updateForm("topic", e.target.value)}
                   placeholder="例如：生态与可持续发展"
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-semibold text-slate-700">任务描述</label>
+              <label className="text-sm font-semibold text-text">任务描述</label>
               <textarea
                 value={form.description}
                 onChange={(e) => updateForm("description", e.target.value)}
                 rows={3}
                 placeholder="描述任务背景、目标与预期产出"
-                className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 resize-none"
+                className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong resize-none"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700">学段</label>
+                <label className="text-sm font-semibold text-text">学段</label>
                 <select
                   value={form.school_stage}
                   onChange={(e) => updateForm("school_stage", e.target.value as SchoolStage)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="primary">小学</option>
                   <option value="middle">初中</option>
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">年级</label>
+                <label className="text-sm font-semibold text-text">年级</label>
                 <select
                   value={form.grade}
                   onChange={(e) => updateForm("grade", Number(e.target.value))}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   {gradeOptions.map((grade) => (
                     <option key={grade} value={grade}>
@@ -1074,37 +1074,37 @@ export function AssignmentDesigner() {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">周期（周）</label>
+                <label className="text-sm font-semibold text-text">周期（周）</label>
                 <input
                   type="number"
                   min={1}
                   max={16}
                   value={form.duration_weeks}
                   onChange={(e) => updateForm("duration_weeks", Number(e.target.value) || 1)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 />
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">截止日期</label>
+                <label className="text-sm font-semibold text-text">截止日期</label>
                 <input
                   type="date"
                   value={form.deadline}
                   onChange={(e) => updateForm("deadline", e.target.value)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-border p-6 space-y-6">
             <h2 className="text-lg font-bold">学科与作业配置</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700">主学科 *</label>
+                <label className="text-sm font-semibold text-text">主学科 *</label>
                 <select
                   value={form.main_subject_id}
                   onChange={(e) => updateForm("main_subject_id", Number(e.target.value))}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value={0}>请选择主学科</option>
                   {stageSubjects.map((subject) => (
@@ -1115,12 +1115,12 @@ export function AssignmentDesigner() {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">融合学科（多选）</label>
-                <div className="mt-2 grid grid-cols-2 gap-2 max-h-48 overflow-auto rounded-xl border border-slate-200 p-3">
+                <label className="text-sm font-semibold text-text">融合学科（多选）</label>
+                <div className="mt-2 grid grid-cols-2 gap-2 max-h-48 overflow-auto rounded-xl border border-border-strong p-3">
                   {stageSubjects
                     .filter((subject) => subject.id !== form.main_subject_id)
                     .map((subject) => (
-                      <label key={subject.id} className="flex items-center gap-2 text-sm text-slate-700">
+                      <label key={subject.id} className="flex items-center gap-2 text-sm text-text">
                         <input
                           type="checkbox"
                           checked={form.related_subject_ids.includes(subject.id)}
@@ -1135,7 +1135,7 @@ export function AssignmentDesigner() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm font-semibold text-slate-700">作业类型</label>
+                <label className="text-sm font-semibold text-text">作业类型</label>
                 <select
                   value={form.assignment_type}
                   onChange={(e) => {
@@ -1143,7 +1143,7 @@ export function AssignmentDesigner() {
                     updateForm("assignment_type", value);
                     updateForm("rubric_dimensions", defaultRubricNames(value));
                   }}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="practical">实践性作业</option>
                   <option value="inquiry">探究性作业</option>
@@ -1152,11 +1152,11 @@ export function AssignmentDesigner() {
               </div>
               {form.assignment_type === "practical" && (
                 <div>
-                  <label className="text-sm font-semibold text-slate-700">实践子类型</label>
+                  <label className="text-sm font-semibold text-text">实践子类型</label>
                   <select
                     value={form.practical_subtype}
                     onChange={(e) => updateForm("practical_subtype", e.target.value as DesignerForm["practical_subtype"])}
-                    className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                    className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                   >
                     <option value="visit">参观考察</option>
                     <option value="simulation">模拟表演</option>
@@ -1166,11 +1166,11 @@ export function AssignmentDesigner() {
               )}
               {form.assignment_type === "inquiry" && (
                 <div>
-                  <label className="text-sm font-semibold text-slate-700">探究子类型</label>
+                  <label className="text-sm font-semibold text-text">探究子类型</label>
                   <select
                     value={form.inquiry_subtype}
                     onChange={(e) => updateForm("inquiry_subtype", e.target.value as DesignerForm["inquiry_subtype"])}
-                    className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                    className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                   >
                     <option value="literature">文献探究</option>
                     <option value="survey">调查探究</option>
@@ -1179,11 +1179,11 @@ export function AssignmentDesigner() {
                 </div>
               )}
               <div>
-                <label className="text-sm font-semibold text-slate-700">探究深度</label>
+                <label className="text-sm font-semibold text-text">探究深度</label>
                 <select
                   value={form.inquiry_depth}
                   onChange={(e) => updateForm("inquiry_depth", e.target.value as InquiryDepth)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="basic">基础探究</option>
                   <option value="intermediate">中等探究</option>
@@ -1191,11 +1191,11 @@ export function AssignmentDesigner() {
                 </select>
               </div>
               <div>
-                <label className="text-sm font-semibold text-slate-700">提交模式</label>
+                <label className="text-sm font-semibold text-text">提交模式</label>
                 <select
                   value={form.submission_mode}
                   onChange={(e) => updateForm("submission_mode", e.target.value as SubmissionMode)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="phased">过程性提交</option>
                   <option value="once">一次性提交</option>
@@ -1205,11 +1205,11 @@ export function AssignmentDesigner() {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
+          <div className="bg-surface rounded-2xl border border-border p-6 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold">参考资料导入与选择（可选）</h2>
-                <p className="text-xs text-slate-500 mt-1">可上传教学资料并作为 AI 生成任务引导的优先参考源。</p>
+                <p className="text-xs text-text-secondary mt-1">可上传教学资料并作为 AI 生成任务引导的优先参考源。</p>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -1222,20 +1222,20 @@ export function AssignmentDesigner() {
                 <button
                   onClick={triggerReferenceUpload}
                   disabled={uploadingReference}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60 flex items-center gap-1"
+                  className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted disabled:opacity-60 flex items-center gap-1"
                 >
                   {uploadingReference ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} 上传参考资料
                 </button>
                 <Link
                   to="/knowledge"
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50"
+                  className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted"
                 >
                   前往知识库
                 </Link>
                 <button
                   onClick={handleGenerateFromLessonPlan}
                   disabled={generatingFromLessonPlan || !referenceDocId}
-                  className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-1"
+                  className="px-3 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover active:bg-primary-active disabled:opacity-60 flex items-center gap-1"
                   title={referenceDocId ? "基于当前已选教案生成作业草稿" : "请先选择一份教案资料"}
                 >
                   {generatingFromLessonPlan ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />} 从教案一键生成
@@ -1248,12 +1248,12 @@ export function AssignmentDesigner() {
                 onClick={() => setReferenceDocId(null)}
                 className={`text-left rounded-xl border p-3 transition-colors ${
                   referenceDocId === null
-                    ? "border-indigo-300 bg-indigo-50"
-                    : "border-slate-200 bg-white hover:bg-slate-50"
+                    ? "border-secondary bg-secondary"
+                    : "border-border-strong bg-surface hover:bg-surface-muted"
                 }`}
               >
-                <p className="text-sm font-semibold text-slate-800">仅使用系统知识库（默认）</p>
-                <p className="text-xs text-slate-500 mt-1">将按学科匹配系统内置课标 chunks 生成任务引导。</p>
+                <p className="text-sm font-semibold text-text">仅使用系统知识库（默认）</p>
+                <p className="text-xs text-text-secondary mt-1">将按学科匹配系统内置课标 chunks 生成任务引导。</p>
               </button>
 
               {customReadyDocuments.map((doc) => (
@@ -1262,18 +1262,18 @@ export function AssignmentDesigner() {
                   onClick={() => setReferenceDocId(doc.id)}
                   className={`text-left rounded-xl border p-3 transition-colors ${
                     referenceDocId === doc.id
-                      ? "border-indigo-300 bg-indigo-50"
-                      : "border-slate-200 bg-white hover:bg-slate-50"
+                      ? "border-secondary bg-secondary"
+                      : "border-border-strong bg-surface hover:bg-surface-muted"
                   }`}
                 >
-                  <p className="text-sm font-semibold text-slate-800 truncate">{doc.filename}</p>
-                  <p className="text-xs text-slate-500 mt-1">导入时间：{new Date(doc.upload_date).toLocaleDateString()}</p>
+                  <p className="text-sm font-semibold text-text truncate">{doc.filename}</p>
+                  <p className="text-xs text-text-secondary mt-1">导入时间：{new Date(doc.upload_date).toLocaleDateString()}</p>
                 </button>
               ))}
             </div>
 
             {customReadyDocuments.length === 0 && (
-              <p className="text-xs text-slate-500">当前暂无可选的自定义资料。你可以先上传文档，再进行 AI 预览。</p>
+              <p className="text-xs text-text-secondary">当前暂无可选的自定义资料。你可以先上传文档，再进行 AI 预览。</p>
             )}
 
             {referenceDocId !== null && !selectedReferenceDocument && (
@@ -1281,29 +1281,29 @@ export function AssignmentDesigner() {
             )}
 
             {selectedReferenceDocument && (
-              <div className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2">
+              <div className="text-xs text-primary bg-secondary border border-secondary rounded-xl px-3 py-2">
                 当前参考资料：{selectedReferenceDocument.filename}
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-6">
+          <div className="bg-surface rounded-2xl border border-border p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold">学习目标与任务步骤</h2>
-                <p className="text-xs text-slate-500 mt-1">默认只保留三个核心字段：任务动作、学习支架、提交证据。</p>
+                <p className="text-xs text-text-secondary mt-1">默认只保留三个核心字段：任务动作、学习支架、提交证据。</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowAdvancedStepFields((prev) => !prev)}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 flex items-center gap-1"
+                  className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted flex items-center gap-1"
                 >
                   {showAdvancedStepFields ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   {showAdvancedStepFields ? "收起高级字段" : "展开高级字段"}
                 </button>
                 <button
                   onClick={addStep}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm font-semibold hover:bg-slate-50 flex items-center gap-1"
+                  className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted flex items-center gap-1"
                 >
                   <Plus className="w-4 h-4" /> 添加步骤
                 </button>
@@ -1311,17 +1311,17 @@ export function AssignmentDesigner() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="md:col-span-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+              <div className="md:col-span-3 rounded-2xl border border-secondary bg-secondary p-4">
                 <div className="flex items-center justify-between gap-2 mb-2">
-                  <p className="text-sm font-semibold text-indigo-800">背景设定（单独展示给学生）</p>
-                  <span className="text-[11px] text-indigo-700">建议 80-180 字，贴近学段语感</span>
+                  <p className="text-sm font-semibold text-primary">背景设定（单独展示给学生）</p>
+                  <span className="text-[11px] text-primary">建议 80-180 字，贴近学段语感</span>
                 </div>
                 <textarea
                   value={form.background_setting}
                   onChange={(e) => updateForm("background_setting", e.target.value)}
                   rows={4}
                   placeholder="例如：背景设定：你们是校园生态小队，本周要为学校食堂与教学楼之间的垃圾分类盲区设计一套可执行改进方案。"
-                  className="w-full px-4 py-3 rounded-xl border border-indigo-200 bg-white resize-none"
+                  className="w-full px-4 py-3 rounded-xl border border-secondary bg-surface resize-none"
                 />
               </div>
               <textarea
@@ -1334,7 +1334,7 @@ export function AssignmentDesigner() {
                 }
                 rows={3}
                 placeholder="知识与技能目标"
-                className="px-4 py-3 rounded-xl border border-slate-200 resize-none"
+                className="px-4 py-3 rounded-xl border border-border-strong resize-none"
               />
               <textarea
                 value={form.objectives_json.process}
@@ -1346,7 +1346,7 @@ export function AssignmentDesigner() {
                 }
                 rows={3}
                 placeholder="过程与方法目标（不含背景设定）"
-                className="px-4 py-3 rounded-xl border border-slate-200 resize-none"
+                className="px-4 py-3 rounded-xl border border-border-strong resize-none"
               />
               <textarea
                 value={form.objectives_json.emotion}
@@ -1358,18 +1358,18 @@ export function AssignmentDesigner() {
                 }
                 rows={3}
                 placeholder="情感态度目标"
-                className="px-4 py-3 rounded-xl border border-slate-200 resize-none"
+                className="px-4 py-3 rounded-xl border border-border-strong resize-none"
               />
             </div>
 
             <div className="space-y-4">
               {form.steps.map((step, index) => (
-                <div key={step.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                <div key={step.id} className="rounded-2xl border border-border-strong bg-surface-muted p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold">步骤 {index + 1}</h3>
                     <button
                       onClick={() => removeStep(step.id)}
-                      className="px-2 py-1 text-xs rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                      className="px-2 py-1 text-xs rounded-md border border-danger/25 text-danger hover:bg-danger-soft"
                     >
                       删除
                     </button>
@@ -1377,32 +1377,32 @@ export function AssignmentDesigner() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <p className="text-[11px] text-slate-500 mb-1">任务动作</p>
+                        <p className="text-[11px] text-text-secondary mb-1">任务动作</p>
                         <input
                           value={step.stepName}
                           onChange={(e) => updateStep(step.id, "stepName", e.target.value)}
                           placeholder="例如：采集校园垃圾分类误投数据"
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                          className="w-full px-3 py-2 rounded-lg border border-border-strong"
                         />
                       </div>
                       <div>
-                        <p className="text-[11px] text-slate-500 mb-1">学习支架</p>
+                        <p className="text-[11px] text-text-secondary mb-1">学习支架</p>
                         <textarea
                           value={step.description}
                           onChange={(e) => updateStep(step.id, "description", e.target.value)}
                           rows={3}
                           placeholder="例如：先明确记录口径，再按时间和点位对比数据差异。"
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 resize-none"
+                          className="w-full px-3 py-2 rounded-lg border border-border-strong resize-none"
                         />
                       </div>
                       <div>
-                        <p className="text-[11px] text-slate-500 mb-1">提交证据</p>
+                        <p className="text-[11px] text-text-secondary mb-1">提交证据</p>
                         <textarea
                           value={step.evidence}
                           onChange={(e) => updateStep(step.id, "evidence", e.target.value)}
                           rows={3}
                           placeholder="例如：观察记录表（document）+ 现场照片（image）"
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 resize-none"
+                          className="w-full px-3 py-2 rounded-lg border border-border-strong resize-none"
                         />
                       </div>
                     </div>
@@ -1410,31 +1410,31 @@ export function AssignmentDesigner() {
                     {showAdvancedStepFields && (
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
-                          <p className="text-[11px] text-slate-500 mb-1">阶段名称（高级）</p>
+                          <p className="text-[11px] text-text-secondary mb-1">阶段名称（高级）</p>
                           <input
                             value={step.phaseName}
                             onChange={(e) => updateStep(step.id, "phaseName", e.target.value)}
                             placeholder="例如：证据采集与整理"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                            className="w-full px-3 py-2 rounded-lg border border-border-strong"
                           />
                         </div>
                         <div>
-                          <p className="text-[11px] text-slate-500 mb-1">课时建议（高级）</p>
+                          <p className="text-[11px] text-text-secondary mb-1">课时建议（高级）</p>
                           <input
                             value={step.lessonTimeSuggestion}
                             onChange={(e) => updateStep(step.id, "lessonTimeSuggestion", e.target.value)}
                             placeholder="例如：1课时"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200"
+                            className="w-full px-3 py-2 rounded-lg border border-border-strong"
                           />
                         </div>
                         <div>
-                          <p className="text-[11px] text-slate-500 mb-1">评价要点（高级）</p>
+                          <p className="text-[11px] text-text-secondary mb-1">评价要点（高级）</p>
                           <textarea
                             value={step.evaluationPoints}
                             onChange={(e) => updateStep(step.id, "evaluationPoints", e.target.value)}
                             rows={3}
                             placeholder="例如：证据完整性、数据准确性、结论可解释性"
-                            className="w-full px-3 py-2 rounded-lg border border-slate-200 resize-none"
+                            className="w-full px-3 py-2 rounded-lg border border-border-strong resize-none"
                           />
                         </div>
                       </div>
@@ -1446,98 +1446,98 @@ export function AssignmentDesigner() {
 
             <div>
               <div className="flex items-center justify-between gap-3">
-                <label className="text-sm font-semibold text-slate-700">评价维度（随作业类型自动生成）</label>
+                <label className="text-sm font-semibold text-text">评价维度（随作业类型自动生成）</label>
                 <button
                   onClick={() => updateForm("rubric_dimensions", defaultRubricNames(form.assignment_type))}
-                  className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  className="px-3 py-1.5 text-xs rounded-lg border border-border-strong text-text-secondary hover:bg-surface-muted"
                 >
                   恢复默认维度
                 </button>
               </div>
-              <div className="mt-2 p-4 rounded-xl border border-slate-200 bg-slate-50">
+              <div className="mt-2 p-4 rounded-xl border border-border-strong bg-surface-muted">
                 <div className="flex flex-wrap gap-2">
                   {(form.rubric_dimensions.length ? form.rubric_dimensions : defaultRubricNames(form.assignment_type)).map((name) => (
                     <span
                       key={name}
-                      className="px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-200 text-slate-700"
+                      className="px-2.5 py-1 rounded-full text-xs font-semibold bg-surface border border-border-strong text-text"
                     >
                       {name}
                     </span>
                   ))}
                 </div>
-                <p className="mt-3 text-[11px] text-slate-500">
+                <p className="mt-3 text-[11px] text-text-secondary">
                   维度会根据作业类型自动切换，也可通过 AI 预览结果覆盖更新。
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-100 p-6">
+          <div className="bg-surface rounded-2xl border border-border p-6">
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handlePreview}
                 disabled={previewing}
-                className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60"
+                className="px-5 py-3 bg-primary hover:bg-primary-hover active:bg-primary-active text-white rounded-xl font-semibold flex items-center gap-2 disabled:opacity-60"
               >
                 {previewing ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />} AI 预览
               </button>
               <button
                 onClick={saveDraft}
                 disabled={saving}
-                className="px-5 py-3 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50 disabled:opacity-60 flex items-center gap-2"
+                className="px-5 py-3 border border-border-strong rounded-xl font-semibold hover:bg-surface-muted disabled:opacity-60 flex items-center gap-2"
               >
                 {saving ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} 保存草稿
               </button>
               <button
                 onClick={publishCurrent}
                 disabled={publishing}
-                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold disabled:opacity-60 flex items-center gap-2"
+                className="px-5 py-3 bg-success hover:bg-success/90 text-white rounded-xl font-semibold disabled:opacity-60 flex items-center gap-2"
               >
                 {publishing ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} 发布作业
               </button>
             </div>
             {editingAssignmentId && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-text-secondary">
                 当前编辑作业 ID：{editingAssignmentId}。后端更新接口暂不支持结构化字段全量更新，系统将优先保存目标、流程与量表内容。
               </p>
             )}
           </div>
 
           {preview && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 space-y-4">
-              <h3 className="font-bold text-indigo-800 flex items-center gap-2">
+            <div className="bg-secondary border border-secondary rounded-2xl p-6 space-y-4">
+              <h3 className="font-bold text-primary flex items-center gap-2">
                 <Sparkles className="w-4 h-4" /> AI 预览结果
               </h3>
               {preview.meta && (
-                <p className="text-xs text-indigo-700">
+                <p className="text-xs text-primary">
                   来源：{generationSourceLabel(preview.meta)} · {preview.meta.prompt_id}@{preview.meta.prompt_version}
                   {preview.meta.used_rag ? " · 含RAG上下文" : ""}
                 </p>
               )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
                 {preview.background_setting && (
-                  <div className="md:col-span-3 bg-white rounded-xl border border-indigo-100 p-3">
-                    <p className="text-xs text-indigo-700 mb-1">背景设定</p>
+                  <div className="md:col-span-3 bg-surface rounded-xl border border-secondary p-3">
+                    <p className="text-xs text-primary mb-1">背景设定</p>
                     <p>{preview.background_setting}</p>
                   </div>
                 )}
-                <div className="bg-white rounded-xl border border-indigo-100 p-3">
-                  <p className="text-xs text-slate-500 mb-1">知识与技能</p>
+                <div className="bg-surface rounded-xl border border-secondary p-3">
+                  <p className="text-xs text-text-secondary mb-1">知识与技能</p>
                   <p>{preview.objectives_json.knowledge || "-"}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-indigo-100 p-3">
-                  <p className="text-xs text-slate-500 mb-1">过程与方法</p>
+                <div className="bg-surface rounded-xl border border-secondary p-3">
+                  <p className="text-xs text-text-secondary mb-1">过程与方法</p>
                   <p>{preview.objectives_json.process || "-"}</p>
                 </div>
-                <div className="bg-white rounded-xl border border-indigo-100 p-3">
-                  <p className="text-xs text-slate-500 mb-1">情感态度</p>
+                <div className="bg-surface rounded-xl border border-secondary p-3">
+                  <p className="text-xs text-text-secondary mb-1">情感态度</p>
                   <p>{preview.objectives_json.emotion || "-"}</p>
                 </div>
               </div>
-              <div className="text-sm text-indigo-700">生成步骤：{preview.steps.length} 个，评价维度：{preview.rubric_dimensions.length} 项</div>
+              <div className="text-sm text-primary">生成步骤：{preview.steps.length} 个，评价维度：{preview.rubric_dimensions.length} 项</div>
               <button
                 onClick={applyPreview}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700"
+                className="px-4 py-2 rounded-xl bg-primary text-white font-semibold hover:bg-primary-hover active:bg-primary-active"
               >
                 应用到当前设计
               </button>
@@ -1547,19 +1547,19 @@ export function AssignmentDesigner() {
       )}
 
       {aiFeedbackFlow && (
-        <div className="fixed bottom-28 right-6 z-40 w-[28rem] max-w-[calc(100vw-2rem)] rounded-3xl border border-indigo-100 bg-white shadow-2xl p-5">
+        <div className="fixed bottom-28 right-6 z-40 w-[28rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-secondary bg-surface shadow-floating p-5">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="mt-0.5 w-8 h-8 rounded-xl bg-secondary text-primary flex items-center justify-center">
               <LoaderCircle className="w-5 h-5 animate-spin" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-900">AI 正在生成，请稍候</p>
-              <p className="text-sm text-slate-600 mt-1">
+              <p className="text-sm font-bold text-text">AI 正在生成，请稍候</p>
+              <p className="text-sm text-text-secondary mt-1">
                 当前阶段：{AI_FEEDBACK_STEPS[aiFeedbackFlow][aiFeedbackStep]}
               </p>
               <div className="mt-3 space-y-1.5">
                 {AI_FEEDBACK_STEPS[aiFeedbackFlow].map((step, index) => (
-                  <p key={step} className={`text-xs ${index <= aiFeedbackStep ? "text-indigo-700" : "text-slate-400"}`}>
+                  <p key={step} className={`text-xs ${index <= aiFeedbackStep ? "text-primary" : "text-text-muted"}`}>
                     {index <= aiFeedbackStep ? "●" : "○"} {step}
                   </p>
                 ))}
@@ -1571,35 +1571,35 @@ export function AssignmentDesigner() {
 
       {notice && (
         <div
-          className={`fixed bottom-6 right-6 z-40 w-[26rem] max-w-[calc(100vw-2rem)] rounded-3xl border bg-white shadow-2xl p-5 ${
+          className={`fixed bottom-6 right-6 z-40 w-[26rem] max-w-[calc(100vw-2rem)] rounded-2xl border bg-surface shadow-floating p-5 ${
             noticeTone === "error"
-              ? "border-red-100"
+              ? "border-danger/20"
               : noticeTone === "warning"
-                ? "border-amber-100"
-                : "border-indigo-100"
+                ? "border-warning/20"
+                : "border-secondary"
           }`}
         >
           <div className="flex items-start gap-3">
             <div
               className={`mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center ${
                 noticeTone === "error"
-                  ? "bg-red-50 text-red-600"
+                  ? "bg-danger-soft text-danger"
                   : noticeTone === "warning"
-                    ? "bg-amber-50 text-amber-600"
-                    : "bg-indigo-50 text-indigo-600"
+                    ? "bg-warning-soft text-warning"
+                    : "bg-secondary text-primary"
               }`}
             >
               {noticeTone === "success" ? <CheckCircle2 className="w-4 h-4" /> : <CircleAlert className="w-4 h-4" />}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800">
+              <p className="text-sm font-semibold text-text">
                 {noticeTone === "error" ? "操作失败" : noticeTone === "warning" ? "请注意" : "操作反馈"}
               </p>
-              <p className="text-sm text-slate-600 mt-1 leading-relaxed">{notice}</p>
+              <p className="text-sm text-text-secondary mt-1 leading-relaxed">{notice}</p>
             </div>
             <button
               onClick={dismissNotice}
-              className="text-slate-400 hover:text-slate-600"
+              className="text-text-muted hover:text-text-secondary"
               aria-label="关闭提示"
             >
               <X className="w-4 h-4" />

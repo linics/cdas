@@ -10,13 +10,21 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary-hover",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-accent",
+        neutral:
+          "border-border bg-surface-muted text-text-secondary [a&]:hover:bg-accent [a&]:hover:text-text",
+        info:
+          "border-info/20 bg-info-soft text-info [a&]:hover:bg-info-soft/80",
+        success:
+          "border-success/20 bg-success-soft text-success [a&]:hover:bg-success-soft/80",
+        warning:
+          "border-warning/20 bg-warning-soft text-warning [a&]:hover:bg-warning-soft/80",
         destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "border-danger/20 bg-danger-soft text-danger [a&]:hover:bg-danger-soft/80 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
         outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          "border-border text-text [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
       },
     },
     defaultVariants: {

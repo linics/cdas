@@ -127,48 +127,43 @@ export function Auth() {
   }, [role]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-[600px] h-[600px] bg-indigo-100 rounded-full blur-3xl opacity-50" />
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-emerald-50 rounded-full blur-3xl opacity-50" />
-
-      <div className="w-full max-w-5xl bg-white rounded-[40px] shadow-2xl shadow-indigo-100 flex overflow-hidden relative z-10 border border-slate-100">
-        <div className="hidden lg:flex flex-1 bg-indigo-600 p-12 text-white flex-col justify-between relative overflow-hidden">
+    <div className="min-h-screen bg-bg flex items-center justify-center p-6">
+      <div className="w-full max-w-5xl bg-surface rounded-2xl shadow-soft flex overflow-hidden border border-border">
+        <div className="hidden lg:flex flex-1 bg-surface-muted p-12 text-text flex-col justify-between border-r border-border">
           <div className="relative z-10">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 font-black text-2xl mb-6 shadow-xl">
+            <div className="w-12 h-12 bg-surface rounded-2xl border border-secondary flex items-center justify-center text-primary font-black text-2xl mb-6 shadow-soft">
               C
             </div>
-            <h1 className="text-4xl font-black mb-4 leading-tight">构建跨学科探究的桥梁</h1>
-            <p className="text-indigo-100 text-lg">CDAS 跨学科作业系统，助力 K12 教育数字化转型。</p>
+            <h1 className="text-4xl font-black text-text mb-4 leading-tight">构建跨学科探究的桥梁</h1>
+            <p className="text-text-secondary text-lg">CDAS 跨学科作业系统，面向 K12 教学场景提供稳定、清晰的日常工作台。</p>
           </div>
 
           <div className="relative z-10 space-y-6">
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-amber-300" />
+            <div className="flex items-center gap-4 bg-surface p-4 rounded-2xl border border-border">
+              <div className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-highlight" />
               </div>
               <p className="text-sm font-medium">账号规则：教师工号登录，学生学号登录</p>
             </div>
-            <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                <IdCard className="w-5 h-5 text-emerald-300" />
+            <div className="flex items-center gap-4 bg-surface p-4 rounded-2xl border border-border">
+              <div className="w-10 h-10 bg-success-soft rounded-xl flex items-center justify-center">
+                <IdCard className="w-5 h-5 text-success" />
               </div>
               <p className="text-sm font-medium">已接入真实后端接口，支持多端数据同步</p>
             </div>
           </div>
-
-          <div className="absolute -bottom-20 -right-20 w-80 h-80 bg-indigo-500 rounded-full blur-3xl opacity-50" />
         </div>
 
         <div className="w-full lg:w-[480px] p-10 md:p-16 flex flex-col">
           <div className="mb-8">
-            <h2 className="text-2xl font-black text-slate-900 mb-2">{mode === "login" ? "账号登录" : "账号注册"}</h2>
-            <p className="text-slate-500 text-sm">{roleDesc}</p>
+            <h2 className="text-2xl font-black text-text mb-2">{mode === "login" ? "账号登录" : "账号注册"}</h2>
+            <p className="text-text-secondary text-sm">{roleDesc}</p>
           </div>
 
-          <div className="flex p-1 bg-slate-100 rounded-2xl mb-8 relative">
+          <div className="flex p-1 bg-secondary rounded-2xl mb-8 relative">
             <div
               className={cn(
-                "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-xl shadow-sm transition-all duration-300 ease-out",
+                "absolute top-1 bottom-1 w-[calc(50%-4px)] bg-surface rounded-xl shadow-sm transition-all duration-300 ease-out",
                 role === "teacher" ? "left-1" : "left-[calc(50%+2px)]",
               )}
             />
@@ -179,7 +174,7 @@ export function Auth() {
               }}
               className={cn(
                 "flex-1 py-3 text-xs font-bold rounded-xl relative z-10 transition-colors flex items-center justify-center gap-2",
-                role === "teacher" ? "text-indigo-600" : "text-slate-400",
+                role === "teacher" ? "text-primary" : "text-text-muted",
               )}
             >
               <School className="w-3.5 h-3.5" /> 我是教师
@@ -191,7 +186,7 @@ export function Auth() {
               }}
               className={cn(
                 "flex-1 py-3 text-xs font-bold rounded-xl relative z-10 transition-colors flex items-center justify-center gap-2",
-                role === "student" ? "text-indigo-600" : "text-slate-400",
+                role === "student" ? "text-primary" : "text-text-muted",
               )}
             >
               <GraduationCap className="w-3.5 h-3.5" /> 我是学生
@@ -201,28 +196,28 @@ export function Auth() {
           {mode === "login" ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{loginLabel}</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">{loginLabel}</label>
                 <div className="relative mt-2">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     placeholder={loginPlaceholder}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">登录密码</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">登录密码</label>
                 <div className="relative mt-2">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type="password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="至少 8 位密码"
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
               </div>
@@ -230,7 +225,7 @@ export function Auth() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold shadow-soft hover:bg-primary-hover active:bg-primary-active transition-all flex items-center justify-center gap-2"
               >
                 {loading ? "登录中..." : "确认登录"}
                 {!loading && <ArrowRight className="w-4 h-4" />}
@@ -239,53 +234,53 @@ export function Auth() {
           ) : (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">姓名</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">姓名</label>
                 <div className="relative mt-2">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="请输入真实姓名"
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">{identityLabel}</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">{identityLabel}</label>
                 <div className="relative mt-2">
-                  <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <IdCard className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     value={identityCode}
                     onChange={(e) => setIdentityCode(e.target.value)}
                     placeholder={`请输入${identityLabel}`}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">手机号</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">手机号</label>
                 <div className="relative mt-2">
-                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="可选，仅用于后续扩展"
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">当前后端暂不保存手机号，仅保留注册必填字段。</p>
+                <p className="mt-2 text-[11px] text-text-muted">当前后端暂不保存手机号，仅保留注册必填字段。</p>
               </div>
 
               {role === "student" && (
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-black uppercase text-slate-400 tracking-widest">年级</label>
+                      <label className="text-xs font-black uppercase text-text-muted tracking-widest">年级</label>
                       <select
                         value={studentGrade}
                         onChange={(e) => setStudentGrade(Number(e.target.value))}
-                        className="w-full mt-2 px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                        className="w-full mt-2 px-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                       >
                         <option value={1}>小学一年级</option>
                         <option value={2}>小学二年级</option>
@@ -299,27 +294,27 @@ export function Auth() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-black uppercase text-slate-400 tracking-widest">班级</label>
+                      <label className="text-xs font-black uppercase text-text-muted tracking-widest">班级</label>
                       <input
                         value={studentClassName}
                         onChange={(e) => setStudentClassName(e.target.value)}
                         placeholder="例如：1班"
-                        className="w-full mt-2 px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                        className="w-full mt-2 px-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                       />
                     </div>
                   </div>
                 )}
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 tracking-widest">设置密码</label>
+                <label className="text-xs font-black uppercase text-text-muted tracking-widest">设置密码</label>
                 <div className="relative mt-2">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
                   <input
                     type="password"
                     value={registerPassword}
                     onChange={(e) => setRegisterPassword(e.target.value)}
                     placeholder="至少 8 位密码"
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all text-sm font-medium"
+                    className="w-full pl-11 pr-4 py-3.5 bg-surface-muted border border-border rounded-2xl outline-none focus:ring-2 focus:ring-focus-ring/40 focus:border-focus-ring transition-all text-sm font-medium"
                   />
                 </div>
               </div>
@@ -327,7 +322,7 @@ export function Auth() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                className="w-full py-4 bg-primary text-primary-foreground rounded-2xl font-bold shadow-soft hover:bg-primary-hover active:bg-primary-active transition-all flex items-center justify-center gap-2"
               >
                 {loading ? "注册中..." : "完成注册"}
                 {!loading && <ArrowRight className="w-4 h-4" />}
@@ -335,24 +330,24 @@ export function Auth() {
             </form>
           )}
 
-          {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
+          {error && <p className="mt-4 text-sm font-medium text-danger">{error}</p>}
 
-          <div className="mt-8 pt-8 border-t border-slate-50 text-center">
-            <p className="text-sm text-slate-500">
+          <div className="mt-8 pt-8 border-t border-border text-center">
+            <p className="text-sm text-text-secondary">
               {mode === "login" ? "还没有账户？" : "已有账户？"}
               <button
                 onClick={() => {
                   setMode(mode === "login" ? "register" : "login");
                   resetError();
                 }}
-                className="text-indigo-600 font-bold ml-1 hover:underline"
+                className="text-primary font-bold ml-1 hover:underline"
               >
                 {mode === "login" ? "立即注册" : "点击登录"}
               </button>
             </p>
           </div>
 
-          <div className="mt-auto pt-6 text-[10px] text-slate-400 text-center leading-relaxed">
+          <div className="mt-auto pt-6 text-[10px] text-text-muted text-center leading-relaxed">
             登录即代表您同意我们的 <button className="underline">服务协议</button> 和 <button className="underline">隐私政策</button>
             <br />
             CDAS © 2026 跨学科教育数字化平台
