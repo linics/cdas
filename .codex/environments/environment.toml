@@ -10,31 +10,62 @@ name = "启动服务"
 icon = "run"
 command = '''
 ROOT="$(git rev-parse --show-toplevel)"
+RUN_DIR="$ROOT/.codex/run"
+BACK_PID_FILE="$RUN_DIR/backend.pid"
+FRONT_PID_FILE="$RUN_DIR/frontend.pid"
 
-for PORT in 8000 5173; do
-  PIDS="$(lsof -ti tcp:$PORT 2>/dev/null)"
-  if [ -n "$PIDS" ]; then
-    kill $PIDS 2>/dev/null || true
+mkdir -p "$RUN_DIR"
+
+stop_tracked_process() {
+  PID_FILE="$1"
+
+  if [ ! -f "$PID_FILE" ]; then
+    return
+  fi
+
+  PID="$(cat "$PID_FILE" 2>/dev/null)"
+  rm -f "$PID_FILE"
+
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+    kill "$PID" 2>/dev/null || true
     sleep 1
-    STILL_RUNNING="$(lsof -ti tcp:$PORT 2>/dev/null)"
-    if [ -n "$STILL_RUNNING" ]; then
-      kill -9 $STILL_RUNNING 2>/dev/null || true
+    if kill -0 "$PID" 2>/dev/null; then
+      kill -9 "$PID" 2>/dev/null || true
     fi
   fi
-done
+}
+
+ensure_port_available() {
+  PORT="$1"
+  LISTENERS="$(lsof -ti tcp:$PORT -sTCP:LISTEN 2>/dev/null)"
+
+  if [ -n "$LISTENERS" ]; then
+    echo "端口 $PORT 已被其他进程占用，未自动终止该进程。" >&2
+    lsof -nP -iTCP:$PORT -sTCP:LISTEN >&2 || true
+    exit 1
+  fi
+}
+
+stop_tracked_process "$BACK_PID_FILE"
+stop_tracked_process "$FRONT_PID_FILE"
+
+ensure_port_available 8000
+ensure_port_available 5173
 
 (
   cd "$ROOT" || exit 1
   ./.venv312/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ) &
 BACK_PID=$!
+echo "$BACK_PID" > "$BACK_PID_FILE"
 
 (
   cd "$ROOT/frontend" || exit 1
   npm run dev:local
 ) &
 FRONT_PID=$!
+echo "$FRONT_PID" > "$FRONT_PID_FILE"
 
-trap 'kill $BACK_PID $FRONT_PID 2>/dev/null' EXIT INT TERM
+trap 'rm -f "$BACK_PID_FILE" "$FRONT_PID_FILE"; kill $BACK_PID $FRONT_PID 2>/dev/null' EXIT INT TERM
 wait
 '''
