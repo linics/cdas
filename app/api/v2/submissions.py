@@ -460,11 +460,11 @@ async def get_submission(
         .first()
     )
     if not submission:
-        raise HTTPException(status_code=404, detail="submission not found")
+        raise HTTPException(status_code=404, detail="提交不存在")
 
     from app.models.user import UserRole
     if current_user.role == UserRole.STUDENT and not _student_has_submission_access(db, submission, current_user.id):
-        raise HTTPException(status_code=403, detail="forbidden")
+        raise HTTPException(status_code=403, detail="无权查看该提交")
 
     assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
     group_context = None

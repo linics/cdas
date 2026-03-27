@@ -21,21 +21,27 @@ import {
   documentsApi,
   getApiErrorMessage,
   subjectsApi,
-  type AIGenerationMeta,
   type Assignment,
-  type AssignmentCreatePayload,
-  type AssignmentType,
   type DocumentItem,
-  type InquiryDepth,
-  type SchoolStage,
-  type SubmissionMode,
   type Subject,
 } from "../lib/api";
+import { type LessonStepDraft } from "../lib/mappers";
 import {
-  lessonStepsToPhases,
-  phasesToLessonSteps,
-  type LessonStepDraft,
-} from "../lib/mappers";
+  assignmentStatusLabel,
+  type AssignmentDesignerForm,
+  type AssignmentDesignerPreviewState,
+  buildDesignerCreatePayload,
+  buildDesignerFormFromAssignment,
+  buildDesignerInitialForm,
+  buildDesignerPreviewState,
+  defaultRubricNames,
+  formatAIGenerationMeta,
+  gradeLabelByStage,
+  mergeDesignerFormWithLessonPlanDraft,
+  mergeDesignerFormWithPreview,
+  buildDesignerUpdatePayload,
+  scoreStageLabel,
+} from "../view-models/assignment";
 import { validateAssignmentDesignerForm } from "../validation/assignment";
 
 type EditorTab = "editor" | "history";
@@ -47,222 +53,6 @@ const AI_FEEDBACK_STEPS: Record<AIFeedbackFlow, string[]> = {
   lessonPlan: ["解析教案与关键信息", "识别主副学科并筛选片段", "生成任务步骤与目标", "校验格式并回填表单"],
 };
 
-interface DesignerForm {
-  title: string;
-  topic: string;
-  description: string;
-  background_setting: string;
-  school_stage: SchoolStage;
-  grade: number;
-  main_subject_id: number;
-  related_subject_ids: number[];
-  assignment_type: AssignmentType;
-  practical_subtype: "visit" | "simulation" | "observation";
-  inquiry_subtype: "literature" | "survey" | "experiment";
-  inquiry_depth: InquiryDepth;
-  submission_mode: SubmissionMode;
-  duration_weeks: number;
-  deadline: string;
-  objectives_json: {
-    knowledge: string;
-    process: string;
-    emotion: string;
-  };
-  steps: LessonStepDraft[];
-  rubric_dimensions: string[];
-}
-
-const DEFAULT_STEPS: LessonStepDraft[] = [
-  {
-    id: "step_1",
-    phaseName: "问题提出",
-    stepName: "明确探究问题",
-    description: "结合情境提出可探究问题，并给出问题边界。",
-    evidence: "问题清单与问题陈述",
-    evaluationPoints: "问题清晰、可探究、与主题相关",
-    lessonTimeSuggestion: "1课时",
-  },
-  {
-    id: "step_2",
-    phaseName: "资料与证据",
-    stepName: "收集多源证据",
-    description: "通过资料检索、调查或实验收集支撑证据。",
-    evidence: "资料摘录、问卷记录或实验原始数据",
-    evaluationPoints: "证据来源可靠、记录完整",
-    lessonTimeSuggestion: "1-2课时",
-  },
-  {
-    id: "step_3",
-    phaseName: "分析与建模",
-    stepName: "形成解释框架",
-    description: "对证据进行整理分析，完成跨学科解释与建模。",
-    evidence: "分析图表、推理过程记录",
-    evaluationPoints: "分析逻辑严谨、跨学科关联明确",
-    lessonTimeSuggestion: "1课时",
-  },
-  {
-    id: "step_4",
-    phaseName: "表达与反思",
-    stepName: "输出成果并反思",
-    description: "完成成果展示，并对过程与结果进行反思。",
-    evidence: "成果报告、展示材料、反思文本",
-    evaluationPoints: "成果完整、反思具体、改进建议可执行",
-    lessonTimeSuggestion: "1课时",
-  },
-];
-
-function defaultRubricNames(type: AssignmentType): string[] {
-  if (type === "practical") {
-    return ["实践准备", "实践参与", "过程记录", "跨学科运用", "成果表达", "反思能力"];
-  }
-  if (type === "project") {
-    return ["问题分析", "规划协作", "迭代改进", "成果质量", "展示汇报", "复盘反思"];
-  }
-  return ["问题意识", "方案设计", "探究过程", "结论质量", "反思能力"];
-}
-
-function generationSourceLabel(meta?: AIGenerationMeta): string {
-  if (!meta || meta.source === "ai") return "AI生成";
-  if (meta.source === "fallback") return "兜底草稿";
-  return "混合结果";
-}
-
-function splitBackgroundFromProcess(processText: string): { background: string; process: string } {
-  const raw = (processText || "").trim();
-  if (!raw) {
-    return { background: "", process: "" };
-  }
-  const prefixes = ["背景设定：", "背景设定:"];
-  const prefix = prefixes.find((item) => raw.startsWith(item));
-  if (!prefix) {
-    return { background: "", process: raw };
-  }
-
-  const body = raw.slice(prefix.length).trim();
-  if (!body) {
-    return { background: "", process: "" };
-  }
-
-  const lines = body
-    .split(/\r?\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length >= 2) {
-    return {
-      background: lines[0],
-      process: lines.slice(1).join("\n").trim(),
-    };
-  }
-
-  const marker = "行动主线：";
-  if (body.includes(marker)) {
-    const [bg, rest] = body.split(marker, 2);
-    return {
-      background: bg.trim(),
-      process: `${marker}${(rest || "").trim()}`.trim(),
-    };
-  }
-
-  if (body.length > 150) {
-    const splitAt = Math.max(
-      body.lastIndexOf("。", 170),
-      body.lastIndexOf("！", 170),
-      body.lastIndexOf("？", 170),
-      body.lastIndexOf("!", 170),
-      body.lastIndexOf("?", 170),
-    );
-    if (splitAt >= 40) {
-      return {
-        background: body.slice(0, splitAt + 1).trim(),
-        process: body.slice(splitAt + 1).trim(),
-      };
-    }
-  }
-
-  return {
-    background: body,
-    process: "",
-  };
-}
-
-function composeProcessWithBackground(background: string, process: string): string {
-  const bg = background.trim();
-  const core = process.trim();
-  if (bg && core) {
-    return `背景设定：${bg}\n${core}`;
-  }
-  if (bg) {
-    return `背景设定：${bg}`;
-  }
-  return core;
-}
-
-function pickOrKeep<T>(nextValue: T | null | undefined, currentValue: T): T {
-  if (nextValue === null || nextValue === undefined) return currentValue;
-  if (typeof nextValue === "string" && !nextValue.trim()) return currentValue;
-  return nextValue;
-}
-
-function mergeRelatedSubjectIds(nextIds: number[] | undefined, currentIds: number[], mainSubjectId: number): number[] {
-  const source = nextIds && nextIds.length ? nextIds : currentIds;
-  const seen = new Set<number>();
-  const merged: number[] = [];
-  for (const id of source) {
-    if (!id || id === mainSubjectId || seen.has(id)) continue;
-    seen.add(id);
-    merged.push(id);
-  }
-  return merged;
-}
-
-function buildInitialForm(): DesignerForm {
-  return {
-    title: "",
-    topic: "",
-    description: "",
-    background_setting: "",
-    school_stage: "middle",
-    grade: 8,
-    main_subject_id: 0,
-    related_subject_ids: [],
-    assignment_type: "inquiry",
-    practical_subtype: "visit",
-    inquiry_subtype: "literature",
-    inquiry_depth: "intermediate",
-    submission_mode: "phased",
-    duration_weeks: 2,
-    deadline: "",
-    objectives_json: {
-      knowledge: "",
-      process: "",
-      emotion: "",
-    },
-    steps: DEFAULT_STEPS.map((item) => ({ ...item })),
-    rubric_dimensions: defaultRubricNames("inquiry"),
-  };
-}
-
-function toDateInputValue(iso: string | null | undefined): string {
-  if (!iso) return "";
-  if (iso.length >= 10) return iso.slice(0, 10);
-  return "";
-}
-
-function toAssignmentStatusText(item: Assignment): string {
-  if (item.is_archived) return "已归档";
-  return item.is_published ? "已发布" : "草稿";
-}
-
-function scoreStageLabel(stage: SchoolStage): string {
-  return stage === "primary" ? "小学" : "初中";
-}
-
-function gradeLabelByStage(stage: SchoolStage, grade: number): string {
-  if (stage === "primary") return `${Math.max(1, Math.min(6, grade))}年级`;
-  return `${Math.max(1, grade - 6)}年级`;
-}
-
 export function AssignmentDesigner() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -270,19 +60,13 @@ export function AssignmentDesigner() {
   const referenceFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [tab, setTab] = useState<EditorTab>("editor");
-  const [form, setForm] = useState<DesignerForm>(() => buildInitialForm());
+  const [form, setForm] = useState<AssignmentDesignerForm>(() => buildDesignerInitialForm());
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [referenceDocId, setReferenceDocId] = useState<number | null>(null);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
-  const [preview, setPreview] = useState<{
-    background_setting: string;
-    objectives_json: DesignerForm["objectives_json"];
-    steps: LessonStepDraft[];
-    rubric_dimensions: string[];
-    meta?: AIGenerationMeta;
-  } | null>(null);
+  const [preview, setPreview] = useState<AssignmentDesignerPreviewState | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -397,33 +181,7 @@ export function AssignmentDesigner() {
 
     setEditingAssignmentId(target.id);
     setReferenceDocId(target.document_id ?? null);
-    setForm({
-      title: target.title,
-      topic: target.topic,
-      description: target.description || "",
-      background_setting: splitBackgroundFromProcess(target.objectives_json?.process || "").background,
-      school_stage: target.school_stage,
-      grade: target.grade,
-      main_subject_id: target.main_subject_id,
-      related_subject_ids: target.related_subject_ids || [],
-      assignment_type: target.assignment_type,
-      practical_subtype: target.practical_subtype || "visit",
-      inquiry_subtype: target.inquiry_subtype || "literature",
-      inquiry_depth: target.inquiry_depth,
-      submission_mode: target.submission_mode,
-      duration_weeks: target.duration_weeks || 2,
-      deadline: toDateInputValue(target.deadline),
-      objectives_json: {
-        knowledge: target.objectives_json?.knowledge || "",
-        process: splitBackgroundFromProcess(target.objectives_json?.process || "").process,
-        emotion: target.objectives_json?.emotion || "",
-      },
-      steps: phasesToLessonSteps(target.phases_json).length
-        ? phasesToLessonSteps(target.phases_json)
-        : DEFAULT_STEPS.map((step) => ({ ...step })),
-      rubric_dimensions:
-        target.rubric_json?.dimensions?.map((item) => item.name).filter(Boolean) || defaultRubricNames(target.assignment_type),
-    });
+    setForm(buildDesignerFormFromAssignment(target));
     setTab("editor");
     setPreview(null);
     showNotice(`已载入：${target.title}`);
@@ -471,7 +229,7 @@ export function AssignmentDesigner() {
     [readyDocuments, referenceDocId],
   );
 
-  const updateForm = <K extends keyof DesignerForm>(key: K, value: DesignerForm[K]) => {
+  const updateForm = <K extends keyof AssignmentDesignerForm>(key: K, value: AssignmentDesignerForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -569,41 +327,6 @@ export function AssignmentDesigner() {
       mode,
     ) ?? (gradeOptions.includes(form.grade) ? null : "当前年级与学段不匹配");
 
-  const toCreatePayload = (): AssignmentCreatePayload => {
-    const phases = lessonStepsToPhases(form.steps);
-    const rubricDimensions = (form.rubric_dimensions.length ? form.rubric_dimensions : defaultRubricNames(form.assignment_type))
-      .map((name) => name.trim())
-      .filter(Boolean)
-      .map((name) => ({ name }));
-
-    return {
-      title: form.title.trim(),
-      topic: form.topic.trim(),
-      description: form.description.trim(),
-      school_stage: form.school_stage,
-      grade: form.grade,
-      main_subject_id: form.main_subject_id,
-      related_subject_ids: form.related_subject_ids,
-      document_id: referenceDocId ?? undefined,
-      assignment_type: form.assignment_type,
-      practical_subtype: form.assignment_type === "practical" ? form.practical_subtype : undefined,
-      inquiry_subtype: form.assignment_type === "inquiry" ? form.inquiry_subtype : undefined,
-      inquiry_depth: form.inquiry_depth,
-      submission_mode: form.submission_mode,
-      duration_weeks: form.duration_weeks,
-      deadline: form.deadline ? `${form.deadline}T23:59:59` : null,
-      objectives_json: {
-        knowledge: form.objectives_json.knowledge,
-        process: composeProcessWithBackground(form.background_setting, form.objectives_json.process),
-        emotion: form.objectives_json.emotion,
-      },
-      phases_json: phases,
-      rubric_json: {
-        dimensions: rubricDimensions,
-      },
-    };
-  };
-
   const handlePreview = async () => {
     const invalid = validateForm("preview");
     if (invalid) {
@@ -615,22 +338,9 @@ export function AssignmentDesigner() {
     beginAIFeedback("preview");
     setError("");
     try {
-      const payload = toCreatePayload();
+      const payload = buildDesignerCreatePayload(form, referenceDocId);
       const result = await assignmentsApi.preview(payload, { forceGenerate: true });
-      const previewSteps = phasesToLessonSteps(result.phases_json);
-      const processParts = splitBackgroundFromProcess(result.objectives_json?.process || "");
-      setPreview({
-        background_setting: processParts.background,
-        objectives_json: {
-          knowledge: result.objectives_json?.knowledge || "",
-          process: processParts.process,
-          emotion: result.objectives_json?.emotion || "",
-        },
-        steps: previewSteps.length ? previewSteps : DEFAULT_STEPS.map((step) => ({ ...step })),
-        rubric_dimensions:
-          result.rubric_json?.dimensions?.map((item) => item.name).filter(Boolean) || defaultRubricNames(form.assignment_type),
-        meta: result.meta,
-      });
+      setPreview(buildDesignerPreviewState(result, form.assignment_type));
       if (result.meta?.source === "fallback") {
         const reason = result.meta.fallback_reason && result.meta.fallback_reason !== "none"
           ? `（原因：${result.meta.fallback_reason}）`
@@ -669,40 +379,7 @@ export function AssignmentDesigner() {
         duration_weeks: form.duration_weeks,
       });
 
-      const generatedSteps = phasesToLessonSteps(generated.phases_json);
-      const generatedRubric =
-        generated.rubric_json?.dimensions?.map((item) => item.name).filter(Boolean) || defaultRubricNames(generated.assignment_type);
-      const processParts = splitBackgroundFromProcess(generated.objectives_json?.process || "");
-
-      setForm((prev) => ({
-        // 核心规则：AI 能补全就补全；未返回时保持用户当前填写不变。
-        ...prev,
-        title: pickOrKeep(generated.title, prev.title),
-        topic: pickOrKeep(generated.topic, prev.topic),
-        description: pickOrKeep(generated.description, prev.description),
-        school_stage: pickOrKeep(generated.school_stage, prev.school_stage),
-        grade: pickOrKeep(generated.grade, prev.grade),
-        main_subject_id: pickOrKeep(generated.main_subject_id, prev.main_subject_id),
-        related_subject_ids: mergeRelatedSubjectIds(
-          generated.related_subject_ids,
-          prev.related_subject_ids,
-          pickOrKeep(generated.main_subject_id, prev.main_subject_id),
-        ),
-        assignment_type: pickOrKeep(generated.assignment_type, prev.assignment_type),
-        practical_subtype: pickOrKeep(generated.practical_subtype, prev.practical_subtype),
-        inquiry_subtype: pickOrKeep(generated.inquiry_subtype, prev.inquiry_subtype),
-        inquiry_depth: pickOrKeep(generated.inquiry_depth, prev.inquiry_depth),
-        submission_mode: pickOrKeep(generated.submission_mode, prev.submission_mode),
-        duration_weeks: pickOrKeep(generated.duration_weeks, prev.duration_weeks),
-        background_setting: pickOrKeep(processParts.background, prev.background_setting),
-        objectives_json: {
-          knowledge: pickOrKeep(generated.objectives_json?.knowledge, prev.objectives_json.knowledge),
-          process: pickOrKeep(processParts.process, prev.objectives_json.process),
-          emotion: pickOrKeep(generated.objectives_json?.emotion, prev.objectives_json.emotion),
-        },
-        steps: generatedSteps.length ? generatedSteps : prev.steps,
-        rubric_dimensions: generatedRubric,
-      }));
+      setForm((prev) => mergeDesignerFormWithLessonPlanDraft(prev, generated));
       setReferenceDocId(generated.document_id);
       setPreview(null);
       if (generated.meta?.source === "fallback") {
@@ -727,13 +404,7 @@ export function AssignmentDesigner() {
 
   const applyPreview = () => {
     if (!preview) return;
-    setForm((prev) => ({
-      ...prev,
-      background_setting: preview.background_setting,
-      objectives_json: preview.objectives_json,
-      steps: preview.steps,
-      rubric_dimensions: preview.rubric_dimensions,
-    }));
+    setForm((prev) => mergeDesignerFormWithPreview(prev, preview));
     showNotice("已应用 AI 预览结果");
     setPreview(null);
   };
@@ -749,24 +420,10 @@ export function AssignmentDesigner() {
     setError("");
     try {
       if (editingAssignmentId) {
-        await assignmentsApi.update(editingAssignmentId, {
-          title: form.title.trim(),
-          topic: form.topic.trim(),
-          description: form.description.trim(),
-          document_id: referenceDocId,
-          deadline: form.deadline ? `${form.deadline}T23:59:59` : null,
-          objectives_json: {
-            ...form.objectives_json,
-            process: composeProcessWithBackground(form.background_setting, form.objectives_json.process),
-          },
-          phases_json: lessonStepsToPhases(form.steps),
-          rubric_json: {
-            dimensions: form.rubric_dimensions.map((name) => ({ name })).filter((item) => item.name.trim()),
-          },
-        });
+        await assignmentsApi.update(editingAssignmentId, buildDesignerUpdatePayload(form, referenceDocId));
         showNotice("作业已更新");
       } else {
-        const created = await assignmentsApi.create(toCreatePayload());
+        const created = await assignmentsApi.create(buildDesignerCreatePayload(form, referenceDocId));
         setEditingAssignmentId(created.id);
         showNotice("草稿创建成功");
       }
@@ -790,25 +447,11 @@ export function AssignmentDesigner() {
           showNotice(invalid, "warning");
           return;
         }
-        const created = await assignmentsApi.create(toCreatePayload());
+        const created = await assignmentsApi.create(buildDesignerCreatePayload(form, referenceDocId));
         targetId = created.id;
         setEditingAssignmentId(created.id);
       } else {
-        await assignmentsApi.update(targetId, {
-          title: form.title.trim(),
-          topic: form.topic.trim(),
-          description: form.description.trim(),
-          document_id: referenceDocId,
-          deadline: form.deadline ? `${form.deadline}T23:59:59` : null,
-          objectives_json: {
-            ...form.objectives_json,
-            process: composeProcessWithBackground(form.background_setting, form.objectives_json.process),
-          },
-          phases_json: lessonStepsToPhases(form.steps),
-          rubric_json: {
-            dimensions: form.rubric_dimensions.map((name) => ({ name })).filter((item) => item.name.trim()),
-          },
-        });
+        await assignmentsApi.update(targetId, buildDesignerUpdatePayload(form, referenceDocId));
       }
 
       await assignmentsApi.publish(targetId);
@@ -829,7 +472,7 @@ export function AssignmentDesigner() {
     setEditingAssignmentId(null);
     setReferenceDocId(null);
     setPreview(null);
-    setForm(buildInitialForm());
+    setForm(buildDesignerInitialForm());
     showNotice("已新建空白设计");
     navigate("/create", { replace: true });
   };
@@ -947,7 +590,7 @@ export function AssignmentDesigner() {
                           : "bg-warning-soft text-warning"
                       }`}
                     >
-                      {toAssignmentStatusText(assignment)}
+                      {assignmentStatusLabel(assignment)}
                     </span>
                   </div>
                   <p className="text-xs text-text-secondary">
@@ -1052,7 +695,7 @@ export function AssignmentDesigner() {
                 <label className="text-sm font-semibold text-text">学段</label>
                 <select
                   value={form.school_stage}
-                  onChange={(e) => updateForm("school_stage", e.target.value as SchoolStage)}
+                  onChange={(e) => updateForm("school_stage", e.target.value as AssignmentDesignerForm["school_stage"])}
                   className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="primary">小学</option>
@@ -1139,7 +782,7 @@ export function AssignmentDesigner() {
                 <select
                   value={form.assignment_type}
                   onChange={(e) => {
-                    const value = e.target.value as AssignmentType;
+                    const value = e.target.value as AssignmentDesignerForm["assignment_type"];
                     updateForm("assignment_type", value);
                     updateForm("rubric_dimensions", defaultRubricNames(value));
                   }}
@@ -1155,7 +798,9 @@ export function AssignmentDesigner() {
                   <label className="text-sm font-semibold text-text">实践子类型</label>
                   <select
                     value={form.practical_subtype}
-                    onChange={(e) => updateForm("practical_subtype", e.target.value as DesignerForm["practical_subtype"])}
+                    onChange={(e) =>
+                      updateForm("practical_subtype", e.target.value as AssignmentDesignerForm["practical_subtype"])
+                    }
                     className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                   >
                     <option value="visit">参观考察</option>
@@ -1169,7 +814,9 @@ export function AssignmentDesigner() {
                   <label className="text-sm font-semibold text-text">探究子类型</label>
                   <select
                     value={form.inquiry_subtype}
-                    onChange={(e) => updateForm("inquiry_subtype", e.target.value as DesignerForm["inquiry_subtype"])}
+                    onChange={(e) =>
+                      updateForm("inquiry_subtype", e.target.value as AssignmentDesignerForm["inquiry_subtype"])
+                    }
                     className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                   >
                     <option value="literature">文献探究</option>
@@ -1182,7 +829,9 @@ export function AssignmentDesigner() {
                 <label className="text-sm font-semibold text-text">探究深度</label>
                 <select
                   value={form.inquiry_depth}
-                  onChange={(e) => updateForm("inquiry_depth", e.target.value as InquiryDepth)}
+                  onChange={(e) =>
+                    updateForm("inquiry_depth", e.target.value as AssignmentDesignerForm["inquiry_depth"])
+                  }
                   className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="basic">基础探究</option>
@@ -1194,7 +843,9 @@ export function AssignmentDesigner() {
                 <label className="text-sm font-semibold text-text">提交模式</label>
                 <select
                   value={form.submission_mode}
-                  onChange={(e) => updateForm("submission_mode", e.target.value as SubmissionMode)}
+                  onChange={(e) =>
+                    updateForm("submission_mode", e.target.value as AssignmentDesignerForm["submission_mode"])
+                  }
                   className="mt-2 w-full px-4 py-3 rounded-xl border border-border-strong"
                 >
                   <option value="phased">过程性提交</option>
@@ -1510,8 +1161,7 @@ export function AssignmentDesigner() {
               </h3>
               {preview.meta && (
                 <p className="text-xs text-primary">
-                  来源：{generationSourceLabel(preview.meta)} · {preview.meta.prompt_id}@{preview.meta.prompt_version}
-                  {preview.meta.used_rag ? " · 含RAG上下文" : ""}
+                  {formatAIGenerationMeta(preview.meta)}
                 </p>
               )}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">

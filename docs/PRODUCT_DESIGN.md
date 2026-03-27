@@ -116,7 +116,9 @@ AI 生成结果 MUST 可编辑，且默认仅形成草稿，不得直接发布�
 ### 4.2 生成链路约束
 
 - `AI 预览` 和 `教案一键生成` MUST 返回结构化 JSON
-- 生成链路 SHOULD 返回 `meta.source/prompt_version/used_rag/fallback_reason`
+- `AI 预览`、`教案一键生成`、`AI 评分建议` SHOULD 返回结构化 `meta`
+- `meta` SHOULD 至少包含 `source/prompt_id/prompt_version/used_rag/fallback_reason`
+- `meta.request_id/meta.stage/meta.warnings` MAY 作为可选观测字段返回
 - 外部模型失败时 MUST 回退到可编辑默认草稿，不能让流程中断
 
 ## 5. 数据合同

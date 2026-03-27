@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.contracts.evaluation import (
+    AIAssistEvaluationResponse,
     AIEvaluationSuggestion,
     EvaluationListResponse,
     EvaluationResponse,
@@ -32,7 +33,7 @@ from app.models import (
 from app.api.v2.auth import get_current_user, require_teacher
 from app.prompts.evaluation_prompts import EvaluationPromptContext, build_evaluation_prompt
 from app.prompts.registry import EVALUATION_AI_ASSIST_PROMPT
-from app.services.ai import DeepSeekJSONClient
+from app.services.ai import DeepSeekJSONClient, generate_ai_request_id
 
 router = APIRouter()
 logger = logging.getLogger("cdas.api")
@@ -176,6 +177,268 @@ def _build_evaluation_response(evaluation: Evaluation) -> EvaluationResponse:
     return response
 
 
+def _truncate_ai_text(
+    value: str,
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> str:
+    text = value or ""
+    if len(text) <= limit:
+        return text
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+    return f"{text[:limit]}..."
+
+
+def _compact_prompt_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).split())
+
+
+def _truncate_compact_prompt_text(value: Any, max_length: Optional[int]) -> str:
+    text = _compact_prompt_text(value)
+    if max_length is None or len(text) <= max_length:
+        return text
+    if max_length <= 3:
+        return text[:max_length]
+    return f"{text[: max_length - 3]}..."
+
+
+def _normalize_json_prompt_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {_compact_prompt_text(key): _normalize_json_prompt_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalize_json_prompt_value(item) for item in value]
+    if isinstance(value, str):
+        return _compact_prompt_text(value)
+    return value
+
+
+def _compact_json_prompt_value(
+    value: Any,
+    *,
+    key_limit: Optional[int],
+    string_limit: Optional[int],
+    list_limit: Optional[int],
+    dict_limit: Optional[int],
+) -> Any:
+    if isinstance(value, dict):
+        items = list(value.items())
+        if dict_limit is not None:
+            items = items[:dict_limit]
+        return {
+            _truncate_compact_prompt_text(key, key_limit): _compact_json_prompt_value(
+                item,
+                key_limit=key_limit,
+                string_limit=string_limit,
+                list_limit=list_limit,
+                dict_limit=dict_limit,
+            )
+            for key, item in items
+        }
+    if isinstance(value, list):
+        items = value if list_limit is None else value[:list_limit]
+        return [
+            _compact_json_prompt_value(
+                item,
+                key_limit=key_limit,
+                string_limit=string_limit,
+                list_limit=list_limit,
+                dict_limit=dict_limit,
+            )
+            for item in items
+        ]
+    if isinstance(value, str):
+        return _truncate_compact_prompt_text(value, string_limit)
+    return value
+
+
+def _dump_prompt_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _serialize_json_for_prompt(
+    value: Any,
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> str:
+    normalized = _normalize_json_prompt_value(value)
+    serialized = _dump_prompt_json(normalized)
+    if len(serialized) <= limit:
+        return serialized
+
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+
+    profiles = [
+        {"key_limit": None, "string_limit": 160, "list_limit": None, "dict_limit": None},
+        {"key_limit": 96, "string_limit": 96, "list_limit": None, "dict_limit": 16},
+        {"key_limit": 72, "string_limit": 64, "list_limit": 8, "dict_limit": 12},
+        {"key_limit": 48, "string_limit": 48, "list_limit": 4, "dict_limit": 8},
+        {"key_limit": 32, "string_limit": 32, "list_limit": 2, "dict_limit": 4},
+        {"key_limit": 20, "string_limit": 20, "list_limit": 1, "dict_limit": 2},
+        {"key_limit": 12, "string_limit": 12, "list_limit": 1, "dict_limit": 1},
+        {"key_limit": 8, "string_limit": 8, "list_limit": 1, "dict_limit": 1},
+        {"key_limit": 4, "string_limit": 4, "list_limit": 1, "dict_limit": 1},
+        {"key_limit": 1, "string_limit": 1, "list_limit": 1, "dict_limit": 1},
+    ]
+
+    last_serialized = serialized
+    for profile in profiles:
+        candidate = _compact_json_prompt_value(
+            normalized,
+            key_limit=profile["key_limit"],
+            string_limit=profile["string_limit"],
+            list_limit=profile["list_limit"],
+            dict_limit=profile["dict_limit"],
+        )
+        serialized = _dump_prompt_json(candidate)
+        if len(serialized) <= limit:
+            return serialized
+        last_serialized = serialized
+
+    return last_serialized
+
+
+def _serialize_rubric_json_for_prompt(
+    dimensions: List[Dict[str, Any]],
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> str:
+    normalized_dimensions: List[Dict[str, Any]] = []
+    for index, dim in enumerate(dimensions, start=1):
+        name = _compact_prompt_text(dim.get("name") if isinstance(dim, dict) else None) or f"Dimension {index}"
+        levels = dim.get("levels") if isinstance(dim, dict) and isinstance(dim.get("levels"), dict) else {}
+        normalized_dimensions.append(
+            {
+                "name": name,
+                "levels": {
+                    str(level): _compact_prompt_text(text)
+                    for level, text in levels.items()
+                    if _compact_prompt_text(text)
+                },
+            }
+        )
+
+    serialized = _dump_prompt_json({"dimensions": normalized_dimensions})
+    if len(serialized) <= limit:
+        return serialized
+
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+
+    def _build_candidate_dimensions(
+        *,
+        include_levels: bool,
+        level_limit: Optional[int],
+        name_limit: Optional[int],
+        max_dimensions: Optional[int],
+    ) -> List[Dict[str, Any]]:
+        source_dimensions = normalized_dimensions if max_dimensions is None else normalized_dimensions[:max_dimensions]
+        candidate_dimensions: List[Dict[str, Any]] = []
+
+        for index, dim in enumerate(source_dimensions, start=1):
+            name = _truncate_compact_prompt_text(dim["name"], name_limit) or f"D{index}"
+            item: Dict[str, Any] = {"name": name}
+            if include_levels:
+                levels = {
+                    level: _truncate_compact_prompt_text(text, level_limit)
+                    for level, text in dim.get("levels", {}).items()
+                    if _truncate_compact_prompt_text(text, level_limit)
+                }
+                if levels:
+                    item["levels"] = levels
+            candidate_dimensions.append(item)
+
+        return candidate_dimensions
+
+    level_profiles = [
+        {"include_levels": True, "level_limit": 160},
+        {"include_levels": True, "level_limit": 96},
+        {"include_levels": True, "level_limit": 64},
+        {"include_levels": True, "level_limit": 32},
+        {"include_levels": False, "level_limit": None},
+    ]
+    name_limits = [96, 64, 48, 32, 24, 16, 12, 8, 4, 1]
+
+    last_serialized = serialized
+    for profile in level_profiles:
+        serialized = _dump_prompt_json(
+            {"dimensions": _build_candidate_dimensions(name_limit=None, max_dimensions=None, **profile)}
+        )
+        if len(serialized) <= limit:
+            return serialized
+        last_serialized = serialized
+
+    for name_limit in name_limits:
+        for profile in level_profiles:
+            serialized = _dump_prompt_json(
+                {"dimensions": _build_candidate_dimensions(name_limit=name_limit, max_dimensions=None, **profile)}
+            )
+            if len(serialized) <= limit:
+                return serialized
+            last_serialized = serialized
+
+    for max_dimensions in range(max(len(normalized_dimensions) - 1, 1), 0, -1):
+        for name_limit in name_limits:
+            for profile in level_profiles:
+                serialized = _dump_prompt_json(
+                    {
+                        "dimensions": _build_candidate_dimensions(
+                            name_limit=name_limit,
+                            max_dimensions=max_dimensions,
+                            **profile,
+                        )
+                    }
+                )
+                if len(serialized) <= limit:
+                    return serialized
+                last_serialized = serialized
+
+    serialized = _dump_prompt_json({"dimensions": [{"name": "D"}]})
+    if len(serialized) <= limit:
+        return serialized
+
+    return last_serialized
+
+
+def _classify_ai_assist_fallback_reason(error: Exception) -> str:
+    lowered = f"{type(error).__name__}: {error}".lower()
+    if "timeout" in lowered or "timed out" in lowered:
+        return "timeout"
+    if "json" in lowered or "parse" in lowered or "decode" in lowered:
+        return "parse_error"
+    return "request_error"
+
+
+def _build_ai_assist_meta(
+    *,
+    source: str,
+    request_id: str,
+    fallback_reason: str = "none",
+    warnings: List[str] | None = None,
+    input_truncated: bool = False,
+) -> Dict[str, Any]:
+    return {
+        "source": source,
+        "prompt_id": EVALUATION_AI_ASSIST_PROMPT.prompt_id,
+        "prompt_version": EVALUATION_AI_ASSIST_PROMPT.version,
+        "used_rag": False,
+        "fallback_reason": fallback_reason,
+        "stage": "evaluation_ai_assist",
+        "request_id": request_id,
+        "warnings": warnings or [],
+        "input_truncated": input_truncated,
+    }
+
+
 def _score_to_level(score: int) -> str:
     return _normalize_level_input(score)
 
@@ -276,7 +539,7 @@ async def create_teacher_evaluation(
         1: EvaluationLevel.IMPROVE,
     }
     if data.score_numeric not in level_map:
-        raise HTTPException(status_code=400, detail="score_numeric must be 1-4")
+        raise HTTPException(status_code=400, detail="score_numeric 必须在 1-4 之间")
     score_level = data.score_level or level_map[data.score_numeric]
     if data.score_level is not None and data.score_level != level_map[data.score_numeric]:
         raise HTTPException(status_code=400, detail="score_level 与 score_numeric 不一致")
@@ -404,20 +667,21 @@ async def list_submission_evaluations(
     return {"evaluations": [_build_evaluation_response(item) for item in evaluations], "total": len(evaluations)}
 
 
-@router.post("/ai-assist")
+@router.post("/ai-assist", response_model=AIAssistEvaluationResponse)
 async def ai_assist_evaluation(
     submission_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_teacher)
 ):
     """AI-assisted evaluation suggestion."""
+    request_id = generate_ai_request_id()
     submission = db.query(Submission).filter(Submission.id == submission_id).first()
     if not submission:
-        raise HTTPException(status_code=404, detail="submission not found")
+        raise HTTPException(status_code=404, detail="提交不存在")
 
     assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
     if not assignment:
-        raise HTTPException(status_code=404, detail="assignment not found")
+        raise HTTPException(status_code=404, detail="作业不存在")
 
     rubric = assignment.rubric_json or {}
     rubric_dims = _normalize_rubric_dimensions(rubric)
@@ -434,9 +698,43 @@ async def ai_assist_evaluation(
 
     attachments = submission.attachments_json or []
     checkpoints = submission.checkpoints_json or {}
-
-    rubric_text = json.dumps({"dimensions": rubric_dims}, ensure_ascii=False)
-    objectives_text = json.dumps(assignment.objectives_json or {}, ensure_ascii=False)
+    warnings: List[str] = []
+    submission_text = _truncate_ai_text(
+        submission_text,
+        limit=1800,
+        warning_key="submission_text_truncated",
+        warnings=warnings,
+    )
+    attachments_text = _serialize_json_for_prompt(
+        attachments,
+        limit=1200,
+        warning_key="attachments_truncated",
+        warnings=warnings,
+    )
+    checkpoints_text = _serialize_json_for_prompt(
+        checkpoints,
+        limit=1200,
+        warning_key="checkpoints_truncated",
+        warnings=warnings,
+    )
+    rubric_text = _serialize_rubric_json_for_prompt(
+        rubric_dims,
+        limit=1800,
+        warning_key="rubric_text_truncated",
+        warnings=warnings,
+    )
+    objectives_text = _serialize_json_for_prompt(
+        assignment.objectives_json or {},
+        limit=1200,
+        warning_key="objectives_text_truncated",
+        warnings=warnings,
+    )
+    phase_context = _truncate_ai_text(
+        phase_context,
+        limit=1200,
+        warning_key="phase_context_truncated",
+        warnings=warnings,
+    )
     prompt_context = EvaluationPromptContext(
         assignment_title=assignment.title,
         assignment_topic=assignment.topic,
@@ -444,8 +742,8 @@ async def ai_assist_evaluation(
         objectives_json=objectives_text,
         phase_context=phase_context,
         submission_text=submission_text,
-        attachments=json.dumps(attachments, ensure_ascii=False),
-        checkpoints=json.dumps(checkpoints, ensure_ascii=False),
+        attachments=attachments_text,
+        checkpoints=checkpoints_text,
         rubric_text=rubric_text,
     )
     system_prompt, user_prompt = build_evaluation_prompt(prompt_context)
@@ -453,15 +751,37 @@ async def ai_assist_evaluation(
     settings = get_settings()
     client = DeepSeekJSONClient(settings, temperature=0.2, max_output_tokens=1200)
     logger.info(
-        "ai_assist called prompt=%s target=%s",
+        "ai_assist called prompt=%s target=%s request_id=%s",
         EVALUATION_AI_ASSIST_PROMPT.log_label(),
         EVALUATION_AI_ASSIST_PROMPT.target_api,
+        request_id,
     )
     suggestion: AIEvaluationSuggestion | None = None
+    meta = _build_ai_assist_meta(
+        source="fallback" if not client.is_available else "ai",
+        request_id=request_id,
+        fallback_reason="provider_unavailable" if not client.is_available else "none",
+        warnings=warnings,
+        input_truncated=bool(warnings),
+    )
     if client.is_available:
         try:
             suggestion = client.structured_predict(AIEvaluationSuggestion, system_prompt, user_prompt)
-        except Exception:
+            meta = _build_ai_assist_meta(
+                source="ai",
+                request_id=request_id,
+                warnings=warnings,
+                input_truncated=bool(warnings),
+            )
+        except Exception as exc:
+            logger.exception("ai_assist failed request_id=%s", request_id)
+            meta = _build_ai_assist_meta(
+                source="fallback",
+                request_id=request_id,
+                fallback_reason=_classify_ai_assist_fallback_reason(exc),
+                warnings=warnings,
+                input_truncated=bool(warnings),
+            )
             suggestion = None
 
     if suggestion is None:
@@ -471,7 +791,7 @@ async def ai_assist_evaluation(
             suggested_level=_score_to_level(overall),
             suggested_score=overall,
             dimension_scores=fallback_scores,
-            feedback="Provide more concrete evidence and align each step with rubric requirements.",
+            feedback="请补充更具体的证据，并逐项对照评价量规完善表达与结论。",
             evidence=[],
             action_items=[
                 "补充关键步骤证据并标注来源。",
@@ -489,9 +809,11 @@ async def ai_assist_evaluation(
     suggestion.suggested_level = _score_to_level(overall_score)
     suggestion.dimension_scores = normalized_scores
 
+    message = "AI 评分建议已生成" if meta["source"] == "ai" else "AI 评分建议已降级为本地建议草稿"
     return {
-        "message": "AI evaluation suggestion generated",
+        "message": message,
         "suggestion": suggestion.model_dump(),
+        "meta": meta,
     }
 
 

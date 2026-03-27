@@ -44,6 +44,27 @@ describe("validation rules", () => {
     expect(validateGroupName("一组", ["一组", "二组"])).toBe("小组名称不能重复");
   });
 
+  it("rejects duplicate related subjects and main subject overlap in assignment designer", () => {
+    expect(
+      validateAssignmentDesignerForm(
+        {
+          title: "校园节水行动",
+          topic: "校园节水行动",
+          school_stage: "middle",
+          grade: 7,
+          main_subject_id: 1,
+          related_subject_ids: [1, 2, 2],
+          rubric_dimensions: ["问题意识", "证据质量"],
+          steps: [
+            { phaseName: "阶段一", stepName: "步骤一", description: "说明", evidence: "文本" },
+            { phaseName: "阶段二", stepName: "步骤二", description: "说明", evidence: "文档" },
+          ],
+        },
+        "publish",
+      ),
+    ).toBe("融合学科不能包含主学科");
+  });
+
   it("requires exact rubric dimensions in teacher evaluation", () => {
     expect(
       validateTeacherEvaluation({
@@ -52,6 +73,16 @@ describe("validation rules", () => {
         feedback: "整体表现不错",
       }),
     ).toBe("评分维度必须与量规维度完全一致");
+  });
+
+  it("requires teacher feedback for grading", () => {
+    expect(
+      validateTeacherEvaluation({
+        rubricDimensions: ["问题意识", "证据质量"],
+        dimensionScores: { 问题意识: 3, 证据质量: 4 },
+        feedback: "   ",
+      }),
+    ).toBe("请填写教师反馈");
   });
 
   it("requires evidence before final submission", () => {
