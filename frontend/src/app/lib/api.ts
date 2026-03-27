@@ -267,6 +267,14 @@ export interface AIGenerationMeta {
   prompt_version: string;
   used_rag: boolean;
   fallback_reason: string;
+  stage?: string;
+  request_id?: string;
+  warnings?: string[];
+  input_truncated?: boolean;
+  selected_chunk_ids?: string[];
+  selected_document_ids?: number[];
+  upstream_extract_source?: "ai" | "fallback" | "manual_merge" | string;
+  upstream_extract_fallback_reason?: string;
 }
 
 export interface Assignment {
@@ -482,15 +490,19 @@ export interface PeerEvaluationPayload {
   suggestions?: string;
 }
 
+export interface AiAssistSuggestion {
+  suggested_level?: string;
+  suggested_score?: number;
+  dimension_scores?: Record<string, number>;
+  feedback?: string;
+  evidence?: Array<{ source?: string; quote?: string; reason?: string }>;
+  action_items?: string[];
+}
+
 export interface AiAssistResponse {
   message: string;
-  suggestion: {
-    suggested_level: EvaluationLevel;
-    suggested_score: number;
-    dimension_scores: Record<string, number>;
-    feedback: string;
-    evidence: Array<{ source: string; quote: string; reason: string }>;
-  };
+  suggestion: AiAssistSuggestion;
+  meta?: AIGenerationMeta;
 }
 
 export type DocumentStatus = "uploaded" | "indexing" | "ready" | "failed";

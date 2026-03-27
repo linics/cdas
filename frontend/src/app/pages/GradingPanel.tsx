@@ -20,6 +20,13 @@ import {
 import { PageState } from "../components/PageState";
 import { StatusBanner } from "../components/StatusBanner";
 import { validateTeacherEvaluation } from "../validation/evaluation";
+import {
+  buildGroupProgressRows,
+  buildGroupScoreSummary,
+  clampScore,
+  formatDateTime,
+  statusLabel as submissionStatusLabel,
+} from "../view-models/submission";
 
 const SCORE_LABELS: Record<number, string> = {
   1: "需改进",
@@ -27,32 +34,6 @@ const SCORE_LABELS: Record<number, string> = {
   3: "良好",
   4: "优秀",
 };
-
-function clampScore(value: number): number {
-  if (!Number.isFinite(value)) return 3;
-  return Math.max(1, Math.min(4, Math.round(value)));
-}
-
-function submissionStatusLabel(status: string): string {
-  if (status === "draft") return "草稿";
-  if (status === "submitted") return "已提交";
-  if (status === "graded") return "已评分";
-  return status;
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "暂无";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "暂无";
-  return date.toLocaleString("zh-CN", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export function GradingPanel() {
   const { user } = useAuth();
@@ -79,114 +60,19 @@ export function GradingPanel() {
     [assignment],
   );
 
-  const groupAggregateRows = useMemo(() => {
-    const totalPhases = assignment?.phases_json?.length || 0;
-
-    const toMs = (value: string | null | undefined): number => {
-      if (!value) return -1;
-      const ms = Date.parse(value);
-      return Number.isFinite(ms) ? ms : -1;
-    };
-
-    const deadlineMs = assignment?.deadline ? toMs(assignment.deadline) : -1;
-    const nowMs = Date.now();
-
-    const groupNameById = new Map<number, string>();
-    assignmentGroups.forEach((group) => {
-      groupNameById.set(group.id, group.name);
-    });
-
-    const buckets = new Map<string, { key: string; label: string; groupId: number | null; submissions: Submission[] }>();
-
-    assignmentSubmissions.forEach((item) => {
-      const isGrouped = !!item.group_id;
-      const key = isGrouped ? `group:${item.group_id}` : "ungrouped";
-      if (!buckets.has(key)) {
-        const groupId = isGrouped ? Number(item.group_id) : null;
-        const fallbackName = isGrouped ? `小组#${item.group_id}` : "个人提交";
-        const label = isGrouped
-          ? groupNameById.get(groupId || 0) || item.group_name || fallbackName
-          : "个人提交";
-        buckets.set(key, {
-          key,
-          label,
-          groupId,
-          submissions: [],
-        });
-      }
-      buckets.get(key)?.submissions.push(item);
-    });
-
-    return Array.from(buckets.values())
-      .map((bucket) => {
-        const sorted = [...bucket.submissions].sort((a, b) => {
-          const aTime = toMs(a.submitted_at || a.created_at);
-          const bTime = toMs(b.submitted_at || b.created_at);
-          return bTime - aTime;
-        });
-
-        const latest = sorted[0] || null;
-        const maxPhase = bucket.submissions.reduce((max, item) => Math.max(max, item.phase_index), -1);
-        const submittedCount = bucket.submissions.filter((item) => item.status === "submitted").length;
-        const gradedCount = bucket.submissions.filter((item) => item.status === "graded").length;
-
-        const lastSubmittedAt = bucket.submissions.reduce<string | null>((latestValue, item) => {
-          const candidate = item.submitted_at || item.created_at;
-          if (!latestValue) return candidate;
-          return toMs(candidate) > toMs(latestValue) ? candidate : latestValue;
-        }, null);
-
-        const lastEvaluatedAt = bucket.submissions.reduce<string | null>((latestValue, item) => {
-          const candidate = item.teacher_evaluated_at || null;
-          if (!candidate) return latestValue;
-          if (!latestValue) return candidate;
-          return toMs(candidate) > toMs(latestValue) ? candidate : latestValue;
-        }, null);
-
-        let riskScore = 0;
-        let riskText = "正常";
-        const hasSubmission = bucket.submissions.length > 0;
-
-        if (deadlineMs > 0) {
-          const msToDeadline = deadlineMs - nowMs;
-          if (!hasSubmission && msToDeadline < 0) {
-            riskScore = 3;
-            riskText = "已逾期未提交";
-          } else if (!hasSubmission && msToDeadline <= 48 * 60 * 60 * 1000) {
-            riskScore = 2;
-            riskText = "临近截止未提交";
-          } else if (msToDeadline < 0 && submittedCount > 0) {
-            riskScore = 2;
-            riskText = "已截止待评分";
-          }
-        }
-
-        if (riskScore < 1 && submittedCount > 0) {
-          riskScore = 1;
-          riskText = "有待评分提交";
-        }
-
-        return {
-          ...bucket,
-          latestSubmission: latest,
-          submittedCount,
-          gradedCount,
-          totalSubmissions: bucket.submissions.length,
-          lastSubmittedAt,
-          lastEvaluatedAt,
-          riskScore,
-          riskText,
-          phaseProgress:
-            totalPhases > 0 && maxPhase >= 0
-              ? `${Math.min(maxPhase + 1, totalPhases)}/${totalPhases}`
-              : `0/${totalPhases || 0}`,
-        };
-      })
-      .sort((a, b) => {
-        if (a.riskScore !== b.riskScore) return b.riskScore - a.riskScore;
-        return toMs(a.lastSubmittedAt) - toMs(b.lastSubmittedAt);
-      });
-  }, [assignmentSubmissions, assignmentGroups, assignment?.phases_json, assignment?.deadline]);
+  const groupAggregateRows = useMemo(
+    () =>
+      buildGroupProgressRows({
+        groups: assignmentGroups,
+        submissions: assignmentSubmissions,
+        totalPhases: assignment?.phases_json?.length || 0,
+        deadline: assignment?.deadline,
+        includeUngrouped: true,
+        preseedGroups: false,
+        latestSubmissionStrategy: "latest_timestamp",
+      }),
+    [assignmentSubmissions, assignmentGroups, assignment?.phases_json, assignment?.deadline],
+  );
 
   const filteredGroupAggregateRows = useMemo(() => {
     if (groupViewFilter === "all") return groupAggregateRows;
@@ -197,36 +83,10 @@ export function GradingPanel() {
     return groupAggregateRows.filter((item) => item.groupId === groupId);
   }, [groupAggregateRows, groupViewFilter]);
 
-  const groupScoreSummary = useMemo(() => {
-    const totals = filteredGroupAggregateRows.reduce(
-      (acc, row) => {
-        acc.totalBuckets += 1;
-        acc.totalSubmissions += row.totalSubmissions;
-        acc.submitted += row.submittedCount;
-        acc.graded += row.gradedCount;
-        acc.highRiskBuckets += row.riskScore >= 2 ? 1 : 0;
-        return acc;
-      },
-      {
-        totalBuckets: 0,
-        totalSubmissions: 0,
-        submitted: 0,
-        graded: 0,
-        highRiskBuckets: 0,
-      },
-    );
-
-    const draft = Math.max(0, totals.totalSubmissions - totals.submitted - totals.graded);
-    const gradedRate = totals.totalSubmissions > 0 ? Math.round((totals.graded / totals.totalSubmissions) * 100) : 0;
-    const pendingRate = totals.totalSubmissions > 0 ? Math.round((totals.submitted / totals.totalSubmissions) * 100) : 0;
-
-    return {
-      ...totals,
-      draft,
-      gradedRate,
-      pendingRate,
-    };
-  }, [filteredGroupAggregateRows]);
+  const groupScoreSummary = useMemo(
+    () => buildGroupScoreSummary(filteredGroupAggregateRows),
+    [filteredGroupAggregateRows],
+  );
 
   const loadData = async () => {
     if (!submissionId) return;
@@ -315,7 +175,7 @@ export function GradingPanel() {
       setDimensionScores(nextScores);
       setScoreNumeric(clampScore(suggestion.suggested_score || 3));
       setFeedback(suggestion.feedback || "");
-      setNotice("AI 建议已生成，请教师复核后提交评分");
+      setNotice(result.message || "AI 建议已生成，请教师复核后提交评分");
     } catch (err) {
       setError(getApiErrorMessage(err, "AI 辅助评分失败"));
     } finally {

@@ -58,11 +58,315 @@ from app.prompts.assignment_prompts import (
     build_lesson_plan_prompt,
 )
 from app.prompts.registry import ASSIGNMENT_LESSON_PLAN_PROMPT, ASSIGNMENT_PREVIEW_PROMPT
-from app.services.ai import DeepSeekJSONClient
+from app.services.ai import DeepSeekJSONClient, generate_ai_request_id
 from app.services.inventory import InventoryService
 from app.utils.text_processing import parse_document
 
 router = APIRouter()
+
+_PROMPT_TEXT_LIMITS = {
+    "assignment_description": 1200,
+    "template_json": 7000,
+    "rag_context": 2400,
+    "lesson_plan_excerpt": 2800,
+    "lesson_plan_extract_excerpt": 3200,
+}
+
+
+def _truncate_prompt_text(
+    value: str,
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> str:
+    text = value or ""
+    if len(text) <= limit:
+        return text
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+    return f"{text[:limit]}..."
+
+
+def _prepare_prompt_excerpt(
+    value: str,
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> tuple[str, bool]:
+    cleaned = " ".join((value or "").split())
+    if not cleaned:
+        return "", False
+    if len(cleaned) <= limit:
+        return cleaned, False
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+    return f"{cleaned[:limit]}...", True
+
+
+def _compact_prompt_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return " ".join(str(value).split())
+
+
+def _truncate_compact_prompt_text(value: Any, max_length: Optional[int]) -> str:
+    text = _compact_prompt_text(value)
+    if max_length is None or len(text) <= max_length:
+        return text
+    if max_length <= 3:
+        return text[:max_length]
+    return f"{text[: max_length - 3]}..."
+
+
+def _normalize_template_steps(raw_steps: Any) -> List[Dict[str, Any]]:
+    if isinstance(raw_steps, dict):
+        raw_steps = [raw_steps]
+    if not isinstance(raw_steps, list):
+        return []
+    return [step for step in raw_steps if isinstance(step, dict)]
+
+
+def _normalize_template_checkpoints(raw_checkpoints: Any) -> List[Dict[str, Any]]:
+    if isinstance(raw_checkpoints, dict):
+        raw_checkpoints = [raw_checkpoints]
+    if isinstance(raw_checkpoints, str):
+        raw_checkpoints = [raw_checkpoints]
+    normalized: List[Dict[str, Any]] = []
+    if not isinstance(raw_checkpoints, list):
+        return normalized
+    for checkpoint in raw_checkpoints:
+        if isinstance(checkpoint, dict):
+            normalized.append(checkpoint)
+        elif checkpoint is not None:
+            normalized.append({"content": str(checkpoint), "evidence_type": "text"})
+    return normalized
+
+
+def _build_template_phases_prompt_view(
+    template_phases: List[Dict[str, Any]],
+    *,
+    phase_name_limit: Optional[int],
+    title_limit: Optional[int],
+    step_name_limit: Optional[int],
+    description_limit: Optional[int],
+    content_limit: Optional[int],
+    checkpoint_limit: Optional[int],
+    max_checkpoints: Optional[int],
+    include_order: bool,
+    include_title: bool,
+    include_step_name: bool,
+    include_description: bool,
+    include_content: bool,
+    include_evidence_type: bool,
+) -> List[Dict[str, Any]]:
+    normalized_phases: List[Dict[str, Any]] = []
+
+    for phase_index, raw_phase in enumerate(template_phases, start=1):
+        if not isinstance(raw_phase, dict):
+            continue
+
+        phase_name = _truncate_compact_prompt_text(
+            raw_phase.get("name") or raw_phase.get("title") or f"阶段{phase_index}",
+            phase_name_limit,
+        ) or f"阶段{phase_index}"
+        phase_item: Dict[str, Any] = {"name": phase_name}
+
+        if include_order:
+            try:
+                phase_order = int(raw_phase.get("order"))
+            except Exception:
+                phase_order = phase_index
+            phase_item["order"] = phase_order
+
+        if include_title:
+            phase_title = _truncate_compact_prompt_text(raw_phase.get("title"), title_limit)
+            if phase_title:
+                phase_item["title"] = phase_title
+
+        normalized_steps: List[Dict[str, Any]] = []
+        for step_index, raw_step in enumerate(_normalize_template_steps(raw_phase.get("steps")), start=1):
+            step_item: Dict[str, Any] = {}
+
+            if include_step_name:
+                step_name = _truncate_compact_prompt_text(
+                    raw_step.get("name") or raw_step.get("title") or f"步骤{step_index}",
+                    step_name_limit,
+                ) or f"步骤{step_index}"
+                step_item["name"] = step_name
+
+            if include_description:
+                description = _truncate_compact_prompt_text(
+                    raw_step.get("description") or raw_step.get("content") or raw_step.get("name") or f"步骤{step_index}",
+                    description_limit,
+                )
+                if description:
+                    step_item["description"] = description
+
+            if include_content:
+                content = _truncate_compact_prompt_text(raw_step.get("content"), content_limit)
+                if content:
+                    step_item["content"] = content
+
+            raw_checkpoints = _normalize_template_checkpoints(
+                raw_step.get("checkpoints") if raw_step.get("checkpoints") is not None else raw_step.get("checkpoint")
+            )
+            if max_checkpoints is not None:
+                raw_checkpoints = raw_checkpoints[:max_checkpoints]
+
+            checkpoints: List[Dict[str, Any]] = []
+            for raw_checkpoint in raw_checkpoints:
+                content = _truncate_compact_prompt_text(
+                    raw_checkpoint.get("content") or raw_checkpoint.get("text") or raw_checkpoint.get("description") or "证据",
+                    checkpoint_limit,
+                ) or "证据"
+                checkpoint_item: Dict[str, Any] = {"content": content}
+                if include_evidence_type:
+                    checkpoint_item["evidence_type"] = _compact_prompt_text(raw_checkpoint.get("evidence_type")) or "text"
+                checkpoints.append(checkpoint_item)
+
+            if not checkpoints:
+                fallback_checkpoint: Dict[str, Any] = {"content": _truncate_compact_prompt_text("证据", checkpoint_limit) or "证据"}
+                if include_evidence_type:
+                    fallback_checkpoint["evidence_type"] = "text"
+                checkpoints = [fallback_checkpoint]
+
+            step_item["checkpoints"] = checkpoints
+            normalized_steps.append(step_item)
+
+        if not normalized_steps:
+            fallback_step: Dict[str, Any] = {
+                "checkpoints": [
+                    {
+                        "content": _truncate_compact_prompt_text("证据", checkpoint_limit) or "证据",
+                        **({"evidence_type": "text"} if include_evidence_type else {}),
+                    }
+                ]
+            }
+            if include_step_name:
+                fallback_step["name"] = "步骤"
+            if include_description:
+                fallback_step["description"] = "完成任务"
+            phase_item["steps"] = [fallback_step]
+        else:
+            phase_item["steps"] = normalized_steps
+
+        normalized_phases.append(phase_item)
+
+    if normalized_phases:
+        return normalized_phases
+
+    return [
+        {
+            "name": "阶段1",
+            "steps": [
+                {
+                    "checkpoints": [{"content": "证据", "evidence_type": "text"}],
+                }
+            ],
+        }
+    ]
+
+
+def _serialize_template_phases_for_prompt(
+    template_phases: List[Dict[str, Any]],
+    *,
+    limit: int,
+    warning_key: str,
+    warnings: List[str],
+) -> str:
+    profiles = [
+        {
+            "phase_name_limit": None,
+            "title_limit": None,
+            "step_name_limit": None,
+            "description_limit": None,
+            "content_limit": None,
+            "checkpoint_limit": None,
+            "max_checkpoints": None,
+            "include_order": True,
+            "include_title": True,
+            "include_step_name": True,
+            "include_description": True,
+            "include_content": True,
+            "include_evidence_type": True,
+        },
+        {
+            "phase_name_limit": 80,
+            "title_limit": 80,
+            "step_name_limit": 48,
+            "description_limit": 240,
+            "content_limit": 180,
+            "checkpoint_limit": 120,
+            "max_checkpoints": 2,
+            "include_order": True,
+            "include_title": True,
+            "include_step_name": True,
+            "include_description": True,
+            "include_content": True,
+            "include_evidence_type": True,
+        },
+        {
+            "phase_name_limit": 48,
+            "title_limit": 48,
+            "step_name_limit": 24,
+            "description_limit": 120,
+            "content_limit": 96,
+            "checkpoint_limit": 72,
+            "max_checkpoints": 1,
+            "include_order": True,
+            "include_title": False,
+            "include_step_name": True,
+            "include_description": True,
+            "include_content": True,
+            "include_evidence_type": True,
+        },
+        {
+            "phase_name_limit": 24,
+            "title_limit": None,
+            "step_name_limit": 16,
+            "description_limit": None,
+            "content_limit": 48,
+            "checkpoint_limit": 32,
+            "max_checkpoints": 1,
+            "include_order": True,
+            "include_title": False,
+            "include_step_name": True,
+            "include_description": False,
+            "include_content": True,
+            "include_evidence_type": True,
+        },
+        {
+            "phase_name_limit": 4,
+            "title_limit": None,
+            "step_name_limit": None,
+            "description_limit": None,
+            "content_limit": None,
+            "checkpoint_limit": 1,
+            "max_checkpoints": 1,
+            "include_order": False,
+            "include_title": False,
+            "include_step_name": False,
+            "include_description": False,
+            "include_content": False,
+            "include_evidence_type": False,
+        },
+    ]
+
+    last_serialized = "[]"
+    for index, profile in enumerate(profiles):
+        candidate = _build_template_phases_prompt_view(template_phases, **profile)
+        serialized = json.dumps(candidate, ensure_ascii=False, separators=(",", ":"))
+        if len(serialized) <= limit:
+            if index > 0 and warning_key not in warnings:
+                warnings.append(warning_key)
+            return serialized
+        last_serialized = serialized
+
+    if warning_key not in warnings:
+        warnings.append(warning_key)
+    return last_serialized
 
 
 def _normalize_group_members_input(db: Session, members_json: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -477,13 +781,28 @@ def _extract_lesson_plan_basics_with_ai(
     text: str,
     db: Session,
     request_data: LessonPlanDraftRequest,
-) -> Dict[str, Any]:
+) -> tuple[Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     client = DeepSeekJSONClient(settings, temperature=0.0, max_output_tokens=600, request_timeout=45)
+    request_id = generate_ai_request_id()
+    warnings: List[str] = []
+    excerpt, _ = _prepare_prompt_excerpt(
+        text,
+        limit=_PROMPT_TEXT_LIMITS["lesson_plan_extract_excerpt"],
+        warning_key="lesson_plan_extract_excerpt_truncated",
+        warnings=warnings,
+    )
     if not client.is_available:
-        return {}
+        return {}, _build_generation_meta(
+            ASSIGNMENT_LESSON_PLAN_PROMPT,
+            source="fallback",
+            fallback_reason="provider_unavailable",
+            stage="lesson_plan_extract",
+            request_id=request_id,
+            warnings=warnings,
+            input_truncated=bool(warnings),
+        )
 
-    excerpt = _summarize_text(text, max_length=3200)
     system_prompt = (
         "你是K12教案结构化提取助手。"
         "只输出JSON对象，不要解释。"
@@ -503,7 +822,15 @@ def _extract_lesson_plan_basics_with_ai(
         extracted = LessonPlanBasicsExtraction.model_validate(payload)
     except Exception as exc:
         _log_ai_generation_error(exc)
-        return {}
+        return {}, _build_generation_meta(
+            ASSIGNMENT_LESSON_PLAN_PROMPT,
+            source="fallback",
+            fallback_reason=_classify_fallback_reason(exc),
+            stage="lesson_plan_extract",
+            request_id=request_id,
+            warnings=warnings,
+            input_truncated=bool(warnings),
+        )
 
     stage = _normalize_school_stage(extracted.school_stage)
     if stage is None:
@@ -517,18 +844,28 @@ def _extract_lesson_plan_basics_with_ai(
         extracted.related_subjects or [],
     )
 
-    return {
-        "school_stage": stage,
-        "grade": extracted.grade,
-        "assignment_type": _normalize_assignment_type(extracted.assignment_type),
-        "practical_subtype": _normalize_practical_subtype(extracted.practical_subtype),
-        "inquiry_subtype": _normalize_inquiry_subtype(extracted.inquiry_subtype),
-        "inquiry_depth": _normalize_inquiry_depth(extracted.inquiry_depth),
-        "submission_mode": _normalize_submission_mode(extracted.submission_mode),
-        "duration_weeks": extracted.duration_weeks,
-        "main_subject_id": main_subject_id,
-        "related_subject_ids": related_subject_ids,
-    }
+    return (
+        {
+            "school_stage": stage,
+            "grade": extracted.grade,
+            "assignment_type": _normalize_assignment_type(extracted.assignment_type),
+            "practical_subtype": _normalize_practical_subtype(extracted.practical_subtype),
+            "inquiry_subtype": _normalize_inquiry_subtype(extracted.inquiry_subtype),
+            "inquiry_depth": _normalize_inquiry_depth(extracted.inquiry_depth),
+            "submission_mode": _normalize_submission_mode(extracted.submission_mode),
+            "duration_weeks": extracted.duration_weeks,
+            "main_subject_id": main_subject_id,
+            "related_subject_ids": related_subject_ids,
+        },
+        _build_generation_meta(
+            ASSIGNMENT_LESSON_PLAN_PROMPT,
+            source="ai",
+            stage="lesson_plan_extract",
+            request_id=request_id,
+            warnings=warnings,
+            input_truncated=bool(warnings),
+        ),
+    )
 
 
 def _build_lesson_plan_seed(
@@ -536,10 +873,10 @@ def _build_lesson_plan_seed(
     document: Document,
     text: str,
     db: Session,
-) -> AssignmentCreate:
+) -> tuple[AssignmentCreate, Dict[str, Any]]:
     doc_meta = document.metadata_json or {}
     fallback_subject_id = doc_meta.get("subject_id") if isinstance(doc_meta, dict) else None
-    extracted = _extract_lesson_plan_basics_with_ai(text, db, request_data)
+    extracted, extract_meta = _extract_lesson_plan_basics_with_ai(text, db, request_data)
 
     inferred_grade = request_data.grade or extracted.get("grade") or _infer_grade_from_text(text) or 8
     inferred_stage = request_data.school_stage or extracted.get("school_stage") or _infer_school_stage(text, inferred_grade)
@@ -552,6 +889,13 @@ def _build_lesson_plan_seed(
     practical_subtype, inquiry_subtype = _infer_subtypes(inferred_type, text)
     practical_subtype = extracted.get("practical_subtype") or practical_subtype
     inquiry_subtype = extracted.get("inquiry_subtype") or inquiry_subtype
+    if inferred_type == AssignmentType.PROJECT:
+        practical_subtype = None
+        inquiry_subtype = None
+    elif inferred_type == AssignmentType.PRACTICAL:
+        inquiry_subtype = None
+    elif inferred_type == AssignmentType.INQUIRY:
+        practical_subtype = None
 
     main_subject_id, related_subject_ids = _infer_subject_ids(
         db,
@@ -582,25 +926,28 @@ def _build_lesson_plan_seed(
     if week_match:
         duration_weeks = max(1, min(16, int(week_match.group(1))))
 
-    return AssignmentCreate(
-        title=title,
-        topic=topic,
-        description=description,
-        school_stage=inferred_stage,
-        grade=inferred_grade,
-        main_subject_id=main_subject_id,
-        related_subject_ids=related_subject_ids,
-        document_id=document.id,
-        assignment_type=inferred_type,
-        practical_subtype=practical_subtype,
-        inquiry_subtype=inquiry_subtype,
-        inquiry_depth=request_data.inquiry_depth or extracted.get("inquiry_depth") or InquiryDepth.INTERMEDIATE,
-        submission_mode=request_data.submission_mode or extracted.get("submission_mode") or SubmissionMode.PHASED,
-        duration_weeks=duration_weeks,
-        deadline=None,
-        objectives_json=None,
-        phases_json=None,
-        rubric_json=None,
+    return (
+        AssignmentCreate(
+            title=title,
+            topic=topic,
+            description=description,
+            school_stage=inferred_stage,
+            grade=inferred_grade,
+            main_subject_id=main_subject_id,
+            related_subject_ids=related_subject_ids,
+            document_id=document.id,
+            assignment_type=inferred_type,
+            practical_subtype=practical_subtype,
+            inquiry_subtype=inquiry_subtype,
+            inquiry_depth=request_data.inquiry_depth or extracted.get("inquiry_depth") or InquiryDepth.INTERMEDIATE,
+            submission_mode=request_data.submission_mode or extracted.get("submission_mode") or SubmissionMode.PHASED,
+            duration_weeks=duration_weeks,
+            deadline=None,
+            objectives_json=None,
+            phases_json=None,
+            rubric_json=None,
+        ),
+        extract_meta,
     )
 
 
@@ -623,7 +970,11 @@ async def preview_assignment(
     original_objectives_empty = _is_empty_json(objectives)
     original_phases_empty = _is_empty_json(phases)
     original_rubric_empty = _is_empty_json(rubric)
-    meta = _build_generation_meta(ASSIGNMENT_PREVIEW_PROMPT, source="manual_merge")
+    meta = _build_generation_meta(
+        ASSIGNMENT_PREVIEW_PROMPT,
+        source="manual_merge",
+        stage="assignment_preview",
+    )
 
     if force_generate:
         lesson_plan_text = _extract_document_text(document) if document else ""
@@ -647,6 +998,12 @@ async def preview_assignment(
                 source="manual_merge",
                 used_rag=bool(gen_meta.get("used_rag")),
                 fallback_reason=gen_meta.get("fallback_reason", "none") if gen_meta.get("source") == "fallback" else "none",
+                stage="assignment_preview",
+                request_id=gen_meta.get("request_id"),
+                warnings=list(gen_meta.get("warnings") or []),
+                input_truncated=bool(gen_meta.get("input_truncated")),
+                selected_chunk_ids=list(gen_meta.get("selected_chunk_ids") or []),
+                selected_document_ids=list(gen_meta.get("selected_document_ids") or []),
             )
 
     objectives, phases, rubric = _ensure_ai_defaults(data, objectives, phases, rubric)
@@ -673,8 +1030,10 @@ async def generate_assignment_from_lesson_plan(
     if not lesson_plan_text.strip():
         raise HTTPException(status_code=400, detail="教案内容为空，无法生成草稿")
 
-    seed = _build_lesson_plan_seed(data, document, lesson_plan_text, db)
+    seed, extract_meta = _build_lesson_plan_seed(data, document, lesson_plan_text, db)
     objectives, phases, rubric, meta = _generate_ai_content_from_lesson_plan_with_meta(seed, lesson_plan_text)
+    meta["upstream_extract_source"] = extract_meta.get("source")
+    meta["upstream_extract_fallback_reason"] = extract_meta.get("fallback_reason")
     objectives, phases, rubric = _ensure_ai_defaults(seed, objectives, phases, rubric)
 
     return {
@@ -1368,12 +1727,12 @@ def _collect_weighted_rag_chunks(
     return deduped
 
 
-def _build_rag_context(data: AssignmentCreate) -> str:
+def _build_rag_context(data: AssignmentCreate) -> tuple[str, Dict[str, Any]]:
     query = " ".join(
         [part for part in [data.title, data.topic, data.description or ""] if part]
     ).strip()
     if not query:
-        return ""
+        return "", {"selected_chunk_ids": [], "selected_document_ids": []}
     main_subject_id = data.main_subject_id
     related_subject_ids = [sid for sid in (data.related_subject_ids or []) if sid != main_subject_id]
     inventory = InventoryService(get_settings())
@@ -1385,8 +1744,10 @@ def _build_rag_context(data: AssignmentCreate) -> str:
         document_id=data.document_id,
     )
     if not chunks:
-        return ""
+        return "", {"selected_chunk_ids": [], "selected_document_ids": []}
     lines: List[str] = []
+    selected_chunk_ids: List[str] = []
+    selected_document_ids: set[int] = set()
     for chunk in chunks[:6]:
         snippet = _summarize_text(chunk.get("text", ""))
         meta_parts: List[str] = []
@@ -1398,8 +1759,17 @@ def _build_rag_context(data: AssignmentCreate) -> str:
             meta_parts.append(f"page={chunk['page']}")
         meta = " ".join(meta_parts)
         meta = f" {meta}" if meta else ""
-        lines.append(f"[chunk_id={chunk.get('id','')}{meta}] {snippet}")
-    return "\n".join(lines)
+        chunk_id = str(chunk.get("id") or "")
+        if chunk_id:
+            selected_chunk_ids.append(chunk_id)
+        document_id = chunk.get("document_id")
+        if isinstance(document_id, int):
+            selected_document_ids.add(document_id)
+        lines.append(f"[chunk_id={chunk_id}{meta}] {snippet}")
+    return "\n".join(lines), {
+        "selected_chunk_ids": selected_chunk_ids,
+        "selected_document_ids": sorted(selected_document_ids),
+    }
 
 
 def _default_objectives(data: AssignmentCreate) -> Dict[str, str]:
@@ -1467,6 +1837,14 @@ def _build_generation_meta(
     source: Literal["ai", "fallback", "manual_merge"],
     used_rag: bool = False,
     fallback_reason: str = "none",
+    stage: Optional[str] = None,
+    request_id: Optional[str] = None,
+    warnings: Optional[List[str]] = None,
+    input_truncated: bool = False,
+    selected_chunk_ids: Optional[List[str]] = None,
+    selected_document_ids: Optional[List[int]] = None,
+    upstream_extract_source: Optional[str] = None,
+    upstream_extract_fallback_reason: Optional[str] = None,
 ) -> Dict[str, Any]:
     return {
         "source": source,
@@ -1474,6 +1852,14 @@ def _build_generation_meta(
         "prompt_version": getattr(prompt_spec, "version", "unknown"),
         "used_rag": used_rag,
         "fallback_reason": fallback_reason,
+        "stage": stage,
+        "request_id": request_id,
+        "warnings": warnings or [],
+        "input_truncated": input_truncated,
+        "selected_chunk_ids": selected_chunk_ids or [],
+        "selected_document_ids": selected_document_ids or [],
+        "upstream_extract_source": upstream_extract_source,
+        "upstream_extract_fallback_reason": upstream_extract_fallback_reason,
     }
 
 
@@ -1505,14 +1891,17 @@ def _generate_ai_content_with_meta(
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     client = DeepSeekJSONClient(settings)
+    request_id = generate_ai_request_id()
     _log_ai_debug(
         "generate_called "
         f"prompt={ASSIGNMENT_PREVIEW_PROMPT.log_label()} "
-        f"target={ASSIGNMENT_PREVIEW_PROMPT.target_api}"
+        f"target={ASSIGNMENT_PREVIEW_PROMPT.target_api} "
+        f"request_id={request_id}"
     )
     template_phases = _get_template_phases(data)
     default_objectives = _default_objectives(data)
     default_rubric = _default_rubric(data.assignment_type)
+    warnings: List[str] = []
 
     if not client.is_available:
         return (
@@ -1523,6 +1912,8 @@ def _generate_ai_content_with_meta(
                 ASSIGNMENT_PREVIEW_PROMPT,
                 source="fallback",
                 fallback_reason="provider_unavailable",
+                stage="assignment_preview",
+                request_id=request_id,
             ),
         )
 
@@ -1567,7 +1958,7 @@ def _generate_ai_content_with_meta(
     main_subject_label = subject_labels[0] if subject_labels else f"id={data.main_subject_id}"
     related_subjects_label = ", ".join(subject_labels[1:]) if len(subject_labels) > 1 else "none"
     reference_document_label = _resolve_document_name(data.document_id)
-    rag_context = _build_rag_context(data)
+    rag_context, rag_meta = _build_rag_context(data)
     used_rag = bool((rag_context or "").strip())
 
     type_guidance = {
@@ -1596,11 +1987,28 @@ def _generate_ai_content_with_meta(
         InquiryDepth.DEEP: "Deep depth: provide goal-level guidance and emphasize quality criteria.",
     }.get(data.inquiry_depth, "Intermediate depth: provide framework plus key prompts.")
 
-    template_json = json.dumps(template_phases, ensure_ascii=False, indent=2)
+    template_json = _serialize_template_phases_for_prompt(
+        template_phases,
+        limit=_PROMPT_TEXT_LIMITS["template_json"],
+        warning_key="template_json_truncated",
+        warnings=warnings,
+    )
+    rag_context = _truncate_prompt_text(
+        rag_context,
+        limit=_PROMPT_TEXT_LIMITS["rag_context"],
+        warning_key="rag_context_truncated",
+        warnings=warnings,
+    )
+    description = _truncate_prompt_text(
+        data.description or "none",
+        limit=_PROMPT_TEXT_LIMITS["assignment_description"],
+        warning_key="assignment_description_truncated",
+        warnings=warnings,
+    )
     prompt_context = AssignmentPreviewPromptContext(
         title=data.title,
         topic=data.topic,
-        description=data.description or "none",
+        description=description,
         school_stage=stage_map.get(data.school_stage, data.school_stage),
         grade=data.grade,
         assignment_type=type_map.get(data.assignment_type, data.assignment_type),
@@ -1644,13 +2052,25 @@ def _generate_ai_content_with_meta(
                 objectives,
                 phases,
                 rubric,
-                _build_generation_meta(ASSIGNMENT_PREVIEW_PROMPT, source="ai", used_rag=used_rag),
+                _build_generation_meta(
+                    ASSIGNMENT_PREVIEW_PROMPT,
+                    source="ai",
+                    used_rag=used_rag,
+                    stage="assignment_preview",
+                    request_id=request_id,
+                    warnings=warnings,
+                    input_truncated=bool(warnings),
+                    selected_chunk_ids=rag_meta["selected_chunk_ids"],
+                    selected_document_ids=rag_meta["selected_document_ids"],
+                ),
             )
         except Exception as exc:
             last_error = exc
             _log_ai_generation_error(exc)
             if attempt == 0:
-                _log_ai_debug(f"preview_retry_on_error reason={_classify_fallback_reason(exc)}")
+                _log_ai_debug(
+                    f"preview_retry_on_error reason={_classify_fallback_reason(exc)} request_id={request_id}"
+                )
                 continue
             break
 
@@ -1666,6 +2086,12 @@ def _generate_ai_content_with_meta(
             source="fallback",
             used_rag=used_rag,
             fallback_reason=fallback_reason,
+            stage="assignment_preview",
+            request_id=request_id,
+            warnings=warnings,
+            input_truncated=bool(warnings),
+            selected_chunk_ids=rag_meta["selected_chunk_ids"],
+            selected_document_ids=rag_meta["selected_document_ids"],
         ),
     )
 
@@ -1681,15 +2107,18 @@ def _generate_ai_content_from_lesson_plan_with_meta(
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     client = DeepSeekJSONClient(settings, temperature=0.1, max_output_tokens=2200, request_timeout=75)
+    request_id = generate_ai_request_id()
     _log_ai_debug(
         "generate_from_lesson_plan_called "
         f"prompt={ASSIGNMENT_LESSON_PLAN_PROMPT.log_label()} "
-        f"target={ASSIGNMENT_LESSON_PLAN_PROMPT.target_api}"
+        f"target={ASSIGNMENT_LESSON_PLAN_PROMPT.target_api} "
+        f"request_id={request_id}"
     )
 
     template_phases = _get_template_phases(data)
     default_objectives = _default_objectives(data)
     default_rubric = _default_rubric(data.assignment_type)
+    warnings: List[str] = []
     if not client.is_available:
         return (
             default_objectives,
@@ -1699,6 +2128,8 @@ def _generate_ai_content_from_lesson_plan_with_meta(
                 ASSIGNMENT_LESSON_PLAN_PROMPT,
                 source="fallback",
                 fallback_reason="provider_unavailable",
+                stage="assignment_generate",
+                request_id=request_id,
             ),
         )
 
@@ -1709,9 +2140,25 @@ def _generate_ai_content_from_lesson_plan_with_meta(
     main_subject_label = subject_labels[0] if subject_labels else f"id={data.main_subject_id}"
     related_subjects_label = ", ".join(subject_labels[1:]) if len(subject_labels) > 1 else "none"
 
-    lesson_plan_excerpt = _summarize_text(lesson_plan_text, max_length=2800)
-    template_json = json.dumps(template_phases, ensure_ascii=False, indent=2)
-    rag_context = _build_rag_context(data)
+    lesson_plan_excerpt, _ = _prepare_prompt_excerpt(
+        lesson_plan_text,
+        limit=_PROMPT_TEXT_LIMITS["lesson_plan_excerpt"],
+        warning_key="lesson_plan_excerpt_truncated",
+        warnings=warnings,
+    )
+    template_json = _serialize_template_phases_for_prompt(
+        template_phases,
+        limit=_PROMPT_TEXT_LIMITS["template_json"],
+        warning_key="template_json_truncated",
+        warnings=warnings,
+    )
+    rag_context, rag_meta = _build_rag_context(data)
+    rag_context = _truncate_prompt_text(
+        rag_context,
+        limit=_PROMPT_TEXT_LIMITS["rag_context"],
+        warning_key="rag_context_truncated",
+        warnings=warnings,
+    )
     used_rag = bool((rag_context or "").strip())
 
     prompt_context = LessonPlanPromptContext(
@@ -1756,13 +2203,25 @@ def _generate_ai_content_from_lesson_plan_with_meta(
                 objectives,
                 phases,
                 rubric,
-                _build_generation_meta(ASSIGNMENT_LESSON_PLAN_PROMPT, source="ai", used_rag=used_rag),
+                _build_generation_meta(
+                    ASSIGNMENT_LESSON_PLAN_PROMPT,
+                    source="ai",
+                    used_rag=used_rag,
+                    stage="assignment_generate",
+                    request_id=request_id,
+                    warnings=warnings,
+                    input_truncated=bool(warnings),
+                    selected_chunk_ids=rag_meta["selected_chunk_ids"],
+                    selected_document_ids=rag_meta["selected_document_ids"],
+                ),
             )
         except Exception as exc:
             last_error = exc
             _log_ai_generation_error(exc)
             if attempt == 0:
-                _log_ai_debug(f"lesson_plan_retry_on_error reason={_classify_fallback_reason(exc)}")
+                _log_ai_debug(
+                    f"lesson_plan_retry_on_error reason={_classify_fallback_reason(exc)} request_id={request_id}"
+                )
                 continue
             break
 
@@ -1778,6 +2237,12 @@ def _generate_ai_content_from_lesson_plan_with_meta(
             source="fallback",
             used_rag=used_rag,
             fallback_reason=fallback_reason,
+            stage="assignment_generate",
+            request_id=request_id,
+            warnings=warnings,
+            input_truncated=bool(warnings),
+            selected_chunk_ids=rag_meta["selected_chunk_ids"],
+            selected_document_ids=rag_meta["selected_document_ids"],
         ),
     )
 

@@ -14,7 +14,7 @@
     "check:lint": "npm run lint",
     "check:typecheck": "npm run typecheck",
     "check:test": "npm run test",
-    "check:api-e2e": "python scripts/run_api_e2e.py",
+    "check:api-e2e": "sh -c 'if [ -x ../.venv312/bin/python ]; then ../.venv312/bin/python scripts/run_api_e2e.py; else python3 scripts/run_api_e2e.py; fi'",
     "check:all": "npm run check:lint && npm run check:typecheck && npm run check:test && npm run check:build && npm run check:api-e2e"
   },
   "dependencies": {

@@ -25,139 +25,24 @@ import {
   type Submission,
 } from "../lib/api";
 import { stageToSchoolLevel } from "../lib/mappers";
+import { splitBackgroundFromProcess } from "../view-models/assignment";
+import {
+  buildGroupProgressRows,
+  collectPhaseEvidenceHints,
+  countCoveredEvidence,
+  evidenceTypeLabel,
+  extractGroupMemberIds,
+  formatDateTime,
+  gradeLabel,
+  groupMemberText,
+  scoreLabel,
+  statusLabel,
+  submissionModeLabel,
+} from "../view-models/submission";
 import { PageState } from "../components/PageState";
 import { StatusBanner } from "../components/StatusBanner";
 import { validateGroupName } from "../validation/classroom";
 import { validateAttachmentDraft, validateSubmissionForSubmit } from "../validation/submission";
-
-function statusLabel(status: string): string {
-  if (status === "draft") return "草稿";
-  if (status === "submitted") return "已提交";
-  if (status === "graded") return "已评分";
-  return status;
-}
-
-function scoreLabel(level: string | null | undefined): string {
-  const mapping: Record<string, string> = {
-    excellent: "优秀",
-    good: "良好",
-    pass: "合格",
-    improve: "需改进",
-  };
-  if (!level) return "";
-  return mapping[level] || level;
-}
-
-function submissionModeLabel(mode: string): string {
-  if (mode === "phased") return "过程性提交";
-  if (mode === "once") return "一次性提交";
-  if (mode === "mixed") return "混合提交";
-  return mode;
-}
-
-function gradeLabel(grade: number): string {
-  if (grade <= 6) return `小学${grade}年级`;
-  return `初中${Math.max(1, grade - 6)}年级`;
-}
-
-function evidenceTypeLabel(value: string | null | undefined): string {
-  const mapping: Record<string, string> = {
-    text: "文本",
-    document: "文档",
-    image: "图片",
-    video: "视频",
-    confirm: "确认",
-    link: "链接",
-  };
-  if (!value) return "";
-  return mapping[value] || value;
-}
-
-function normalizeForMatch(value: string): string {
-  return (value || "").toLowerCase().replace(/\s+/g, "");
-}
-
-function splitBackgroundFromProcess(processText: string): { background: string; process: string } {
-  const raw = (processText || "").trim();
-  if (!raw) {
-    return { background: "", process: "" };
-  }
-
-  if (!raw.startsWith("背景设定：") && !raw.startsWith("背景设定:")) {
-    return { background: "", process: raw };
-  }
-
-  const body = raw.replace(/^背景设定[:：]\s*/, "").trim();
-  if (!body) {
-    return { background: "", process: "" };
-  }
-
-  const lines = body
-    .split(/\r?\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (lines.length >= 2) {
-    return {
-      background: lines[0],
-      process: lines.slice(1).join("\n").trim(),
-    };
-  }
-
-  const marker = "行动主线：";
-  if (body.includes(marker)) {
-    const [bg, rest] = body.split(marker, 2);
-    return {
-      background: bg.trim(),
-      process: `${marker}${(rest || "").trim()}`.trim(),
-    };
-  }
-
-  if (body.length > 150) {
-    const splitAt = Math.max(
-      body.lastIndexOf("。", 170),
-      body.lastIndexOf("！", 170),
-      body.lastIndexOf("？", 170),
-      body.lastIndexOf("!", 170),
-      body.lastIndexOf("?", 170),
-    );
-    if (splitAt >= 40) {
-      return {
-        background: body.slice(0, splitAt + 1).trim(),
-        process: body.slice(splitAt + 1).trim(),
-      };
-    }
-  }
-
-  return { background: body, process: "" };
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "暂无";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "暂无";
-  return date.toLocaleString("zh-CN", {
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function extractGroupMemberIds(group: AssignmentGroup): number[] {
-  return (group.members_json || [])
-    .map((item) => Number(item.user_id))
-    .filter((value) => Number.isFinite(value) && value > 0);
-}
-
-function groupMemberText(group: AssignmentGroup): string {
-  const names = (group.members_json || [])
-    .map((item) => item.name || item.username || `ID:${item.user_id}`)
-    .filter(Boolean);
-  return names.join("、") || "暂无成员";
-}
 
 export function AssignmentDetail() {
   const { user } = useAuth();
@@ -362,35 +247,12 @@ export function AssignmentDetail() {
     return splitBackgroundFromProcess(processText);
   }, [assignment]);
 
-  const phaseEvidenceHints = useMemo(() => {
-    if (!currentPhase || !Array.isArray(currentPhase.steps)) {
-      return [] as Array<{ content: string; evidenceType: string }>;
-    }
-    const seen = new Set<string>();
-    const hints: Array<{ content: string; evidenceType: string }> = [];
-    currentPhase.steps.forEach((step) => {
-      if (!step || !Array.isArray(step.checkpoints)) return;
-      step.checkpoints.forEach((cp) => {
-        const content = (cp?.content || "").trim();
-        if (!content) return;
-        if (seen.has(content)) return;
-        seen.add(content);
-        hints.push({ content, evidenceType: cp?.evidence_type || "text" });
-      });
-    });
-    return hints;
-  }, [currentPhase]);
+  const phaseEvidenceHints = useMemo(() => collectPhaseEvidenceHints(currentPhase), [currentPhase]);
 
-  const coveredEvidenceCount = useMemo(() => {
-    if (!phaseEvidenceHints.length) return 0;
-    const attachmentText = attachments.map((item) => `${item.filename} ${item.url}`).join(" ");
-    const combined = normalizeForMatch(`${contentText} ${attachmentText}`);
-    if (!combined) return 0;
-    return phaseEvidenceHints.filter((hint) => {
-      const normalizedHint = normalizeForMatch(hint.content);
-      return normalizedHint.length >= 2 && combined.includes(normalizedHint);
-    }).length;
-  }, [phaseEvidenceHints, contentText, attachments]);
+  const coveredEvidenceCount = useMemo(
+    () => countCoveredEvidence(phaseEvidenceHints, contentText, attachments),
+    [phaseEvidenceHints, contentText, attachments],
+  );
 
   const addHintToSubmission = (hint: string) => {
     const entry = `- ${hint}`;
@@ -407,92 +269,19 @@ export function AssignmentDetail() {
     [evaluations],
   );
 
-  const groupProgress = useMemo(() => {
-    const totalPhases = assignment?.phases_json?.length || 0;
-    const byGroup = new Map<number, Submission[]>();
-
-    const toMs = (value: string | null | undefined): number => {
-      if (!value) return -1;
-      const ms = Date.parse(value);
-      return Number.isFinite(ms) ? ms : -1;
-    };
-
-    const deadlineMs = assignment?.deadline ? toMs(assignment.deadline) : -1;
-    const nowMs = Date.now();
-
-    submissions.forEach((item) => {
-      if (!item.group_id) return;
-      const list = byGroup.get(item.group_id) || [];
-      list.push(item);
-      byGroup.set(item.group_id, list);
-    });
-
-    return assignmentGroups.map((group) => {
-      const list = byGroup.get(group.id) || [];
-      const sorted = [...list].sort((a, b) => {
-        if (a.phase_index !== b.phase_index) return b.phase_index - a.phase_index;
-        return a.created_at < b.created_at ? 1 : -1;
-      });
-      const latest = sorted[0] || null;
-      const maxPhase = list.reduce((max, item) => Math.max(max, item.phase_index), -1);
-
-      const lastSubmitted = list.reduce<string | null>((latestValue, item) => {
-        const candidate = item.submitted_at || item.created_at;
-        if (!latestValue) return candidate;
-        return toMs(candidate) > toMs(latestValue) ? candidate : latestValue;
-      }, null);
-
-      const lastEvaluated = list.reduce<string | null>((latestValue, item) => {
-        const candidate = item.teacher_evaluated_at || null;
-        if (!candidate) return latestValue;
-        if (!latestValue) return candidate;
-        return toMs(candidate) > toMs(latestValue) ? candidate : latestValue;
-      }, null);
-
-      let riskScore = 0;
-      let riskText = "正常";
-      const hasSubmission = list.length > 0;
-      const hasPendingEvaluation = list.some((item) => item.status === "submitted");
-
-      if (deadlineMs > 0) {
-        const msToDeadline = deadlineMs - nowMs;
-        if (!hasSubmission && msToDeadline < 0) {
-          riskScore = 3;
-          riskText = "已逾期未提交";
-        } else if (!hasSubmission && msToDeadline <= 48 * 60 * 60 * 1000) {
-          riskScore = 2;
-          riskText = "临近截止未提交";
-        } else if (msToDeadline < 0 && hasPendingEvaluation) {
-          riskScore = 2;
-          riskText = "已截止待评分";
-        }
-      }
-
-      if (riskScore < 1 && hasPendingEvaluation) {
-        riskScore = 1;
-        riskText = "有待评分提交";
-      }
-
-      return {
-        group,
-        latestSubmission: latest,
-        totalSubmissions: list.length,
-        submittedCount: list.filter((item) => item.status === "submitted").length,
-        gradedCount: list.filter((item) => item.status === "graded").length,
-        lastSubmittedAt: lastSubmitted,
-        lastEvaluatedAt: lastEvaluated,
-        riskScore,
-        riskText,
-        phaseProgress:
-          totalPhases > 0 && maxPhase >= 0
-            ? `${Math.min(maxPhase + 1, totalPhases)}/${totalPhases}`
-            : `0/${totalPhases || 0}`,
-      };
-    }).sort((a, b) => {
-      if (a.riskScore !== b.riskScore) return b.riskScore - a.riskScore;
-      return toMs(a.lastSubmittedAt) - toMs(b.lastSubmittedAt);
-    });
-  }, [assignmentGroups, submissions, assignment?.phases_json, assignment?.deadline]);
+  const groupProgress = useMemo(
+    () =>
+      buildGroupProgressRows({
+        groups: assignmentGroups,
+        submissions,
+        totalPhases: assignment?.phases_json?.length || 0,
+        deadline: assignment?.deadline,
+        includeUngrouped: false,
+        preseedGroups: true,
+        latestSubmissionStrategy: "highest_phase_then_time",
+      }),
+    [assignmentGroups, submissions, assignment?.phases_json, assignment?.deadline],
+  );
 
   const highRiskCount = useMemo(
     () => groupProgress.filter((item) => item.riskScore >= 2).length,

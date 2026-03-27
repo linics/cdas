@@ -1,6 +1,8 @@
 import React from "react";
 import { AlertCircle, CheckCircle2, Info, ShieldAlert } from "lucide-react";
 
+import { Button } from "./ui/button";
+
 type StatusTone = "success" | "error" | "info" | "warning";
 
 interface StatusBannerProps {
@@ -14,32 +16,32 @@ interface StatusBannerProps {
 function toneStyle(tone: StatusTone) {
   if (tone === "success") {
     return {
-      wrapper: "bg-success-soft border-success/20 text-success",
-      button: "border-success/25 text-success hover:bg-success-soft/80",
+      wrapper: "bg-success-soft border-success/20 text-success-on-soft",
       Icon: CheckCircle2,
+      buttonVariant: "success" as const,
     };
   }
 
   if (tone === "error") {
     return {
-      wrapper: "bg-danger-soft border-danger/20 text-danger",
-      button: "border-danger/25 text-danger hover:bg-danger-soft/80",
+      wrapper: "bg-danger-soft border-danger/20 text-danger-on-soft",
       Icon: AlertCircle,
+      buttonVariant: "destructive" as const,
     };
   }
 
   if (tone === "warning") {
     return {
-      wrapper: "bg-warning-soft border-warning/20 text-warning",
-      button: "border-warning/25 text-warning hover:bg-warning-soft/80",
+      wrapper: "bg-warning-soft border-warning/20 text-warning-on-soft",
       Icon: ShieldAlert,
+      buttonVariant: "warning" as const,
     };
   }
 
   return {
-    wrapper: "bg-info-soft border-info/20 text-info",
-    button: "border-info/25 text-info hover:bg-info-soft/80",
+    wrapper: "bg-info-soft border-info/20 text-info-on-soft",
     Icon: Info,
+    buttonVariant: "info" as const,
   };
 }
 
@@ -50,19 +52,21 @@ export function StatusBanner({
   onAction,
   className = "",
 }: StatusBannerProps) {
-  const { wrapper, button, Icon } = toneStyle(tone);
+  const { wrapper, Icon, buttonVariant } = toneStyle(tone);
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 text-sm flex items-center gap-2 ${wrapper} ${className}`.trim()}>
-      <Icon className="w-4 h-4 shrink-0" />
+    <div className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm shadow-soft ${wrapper} ${className}`.trim()}>
+      <Icon className="h-4 w-4 shrink-0" />
       <span className="leading-relaxed">{message}</span>
       {actionLabel && onAction && (
-        <button
+        <Button
           onClick={onAction}
-          className={`ml-auto px-2.5 py-1 rounded-lg border bg-surface text-xs font-semibold ${button}`}
+          variant={buttonVariant}
+          size="sm"
+          className="ml-auto shrink-0 rounded-lg px-3 text-xs"
         >
           {actionLabel}
-        </button>
+        </Button>
       )}
     </div>
   );

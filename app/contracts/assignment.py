@@ -263,6 +263,14 @@ class AIGenerationMeta(BaseModel):
     prompt_version: str
     used_rag: bool = False
     fallback_reason: str = "none"
+    stage: Optional[str] = None
+    request_id: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
+    input_truncated: bool = False
+    selected_chunk_ids: List[str] = Field(default_factory=list)
+    selected_document_ids: List[int] = Field(default_factory=list)
+    upstream_extract_source: Optional[str] = None
+    upstream_extract_fallback_reason: Optional[str] = None
 
 
 class AssignmentPreviewResponse(BaseModel):

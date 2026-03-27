@@ -31,6 +31,34 @@ def expect(resp, status_codes, label):
     return resp
 
 
+def _assert_preview_meta(meta: dict[str, object], expected_source: str) -> None:
+    required = {"source", "prompt_id", "prompt_version", "used_rag", "fallback_reason"}
+    missing = sorted(required - set(meta))
+    if missing:
+        raise RuntimeError(f"preview meta missing keys: {missing}")
+    if meta.get("source") != expected_source:
+        raise RuntimeError(
+            f"preview meta source mismatch: {meta.get('source')} != {expected_source}"
+        )
+    if not isinstance(meta.get("prompt_id"), str) or not meta.get("prompt_id"):
+        raise RuntimeError("preview meta prompt_id missing")
+    if not isinstance(meta.get("prompt_version"), str) or not meta.get("prompt_version"):
+        raise RuntimeError("preview meta prompt_version missing")
+
+
+def _assert_evaluation_readback(resp_json: dict[str, object], expected_score: int) -> None:
+    evaluations = resp_json.get("evaluations") or []
+    if not evaluations:
+        raise RuntimeError("no evaluations returned for submission")
+    first = evaluations[0]
+    if not isinstance(first, dict):
+        raise RuntimeError("evaluation payload malformed")
+    if first.get("score_numeric") != expected_score:
+        raise RuntimeError(
+            f"teacher evaluation score mismatch: {first.get('score_numeric')} != {expected_score}"
+        )
+
+
 def main():
     suffix = f"{int(time.time())}_{''.join(random.choices(string.ascii_lowercase + string.digits, k=4))}"
     teacher_username = f"teacher_{suffix}"
@@ -101,6 +129,13 @@ def main():
     resp = requests.get(f"{BASE}/api/v2/auth/me", headers=student_headers, timeout=10)
     expect(resp, 200, "student /me")
     summary["student_me"] = resp.json()
+
+    resp = requests.get(f"{BASE}/api/v2/assignments/ai-status", headers=teacher_headers, timeout=10)
+    expect(resp, 200, "ai status")
+    ai_status = resp.json()
+    if "available" not in ai_status or "model" not in ai_status:
+        raise RuntimeError(f"ai-status payload missing fields: {ai_status}")
+    summary["ai_status"] = ai_status
 
     resp = requests.get(f"{BASE}/api/v2/subjects/", timeout=10)
     expect(resp, 200, "list subjects")
@@ -199,6 +234,29 @@ def main():
                 for name in rubric_names
             ]
         },
+    }
+
+    resp = requests.post(
+        f"{BASE}/api/v2/assignments/preview",
+        headers=teacher_headers,
+        params={"force_generate": "false"},
+        json=assignment_payload,
+        timeout=20,
+    )
+    expect(resp, 200, "assignment preview")
+    preview = resp.json()
+    preview_meta = preview.get("meta")
+    if not isinstance(preview_meta, dict):
+        raise RuntimeError(f"preview meta missing: {preview}")
+    _assert_preview_meta(preview_meta, expected_source="manual_merge")
+    if len(preview.get("phases_json") or []) < 2:
+        raise RuntimeError("preview phases too short")
+    if len((preview.get("rubric_json") or {}).get("dimensions") or []) < 2:
+        raise RuntimeError("preview rubric too short")
+    summary["assignment_preview"] = {
+        "meta": preview_meta,
+        "phase_count": len(preview.get("phases_json") or []),
+        "rubric_dimension_count": len((preview.get("rubric_json") or {}).get("dimensions") or []),
     }
 
     resp = requests.post(
@@ -352,6 +410,19 @@ def main():
         "id": teacher_eval.get("id"),
         "score_numeric": teacher_eval.get("score_numeric"),
         "score_level": teacher_eval.get("score_level"),
+    }
+
+    resp = requests.get(
+        f"{BASE}/api/v2/evaluations/submission/{submission_for_grade['id']}",
+        headers=teacher_headers,
+        timeout=15,
+    )
+    expect(resp, 200, "teacher evaluation readback")
+    eval_readback = resp.json()
+    _assert_evaluation_readback(eval_readback, expected_score=3)
+    summary["teacher_evaluation_readback"] = {
+        "total": eval_readback.get("total"),
+        "evaluations": len(eval_readback.get("evaluations") or []),
     }
 
     resp = requests.get(

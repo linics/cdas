@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 
 from app.api.documents import router as documents_router
@@ -97,7 +98,7 @@ def create_app() -> FastAPI:
         expose_headers=["*"],
     )
 
-    from fastapi import Request, Response
+    from fastapi import Request
 
     @app.middleware("http")
     async def catch_exceptions_middleware(request: Request, call_next):
@@ -111,7 +112,10 @@ def create_app() -> FastAPI:
                     "method": request.method,
                 },
             )
-            return Response("Internal Server Error", status_code=500)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "服务器内部错误，请稍后重试"},
+            )
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -127,4 +131,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-

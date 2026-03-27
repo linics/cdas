@@ -45,6 +45,9 @@
 - 对新增 `400/422` 提示展示 `detail`
 - 在保存前将旧结构归一化为当前写入合同
 - 对历史默认占位 rubric 保持评分兼容；对显式 rubric 按严格维度对齐处理
+- 对 AI 响应中的新增可选 `meta` 字段采用 defensive defaults，不将其视为必填
+- 对 `preview`、`from-lesson-plan`、`ai-assist` 的 `meta.source/prompt_id/prompt_version/used_rag/fallback_reason` 做向后兼容消费
+- 对 `from-lesson-plan` 等链路中的 `meta.input_truncated` 与 lesson plan warning 做语义兼容消费：它们表示模型输入在进入推理前发生过压缩或截断，而不是仅表示最后一次字符串截断函数命中
 
 ## Required Checks
 

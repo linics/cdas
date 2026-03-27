@@ -2,6 +2,8 @@ import React from "react";
 import { Link } from "react-router";
 import { AlertCircle, Info, LoaderCircle, ShieldAlert } from "lucide-react";
 
+import { Button } from "./ui/button";
+
 type PageStateVariant = "loading" | "info" | "warning" | "error";
 
 interface PageStateProps {
@@ -17,20 +19,22 @@ function variantStyle(variant: PageStateVariant) {
   if (variant === "error") {
     return {
       wrapper: "border-danger/20 bg-danger-soft",
-      iconWrapper: "bg-surface text-danger",
+      iconWrapper: "bg-surface text-danger-on-soft",
       icon: AlertCircle,
-      title: "text-danger",
-      desc: "text-danger",
+      title: "text-danger-on-soft",
+      desc: "text-danger-on-soft",
+      actionVariant: "destructive" as const,
     };
   }
 
   if (variant === "warning") {
     return {
       wrapper: "border-warning/20 bg-warning-soft",
-      iconWrapper: "bg-surface text-warning",
+      iconWrapper: "bg-surface text-warning-on-soft",
       icon: ShieldAlert,
-      title: "text-warning",
-      desc: "text-warning",
+      title: "text-warning-on-soft",
+      desc: "text-warning-on-soft",
+      actionVariant: "warning" as const,
     };
   }
 
@@ -41,15 +45,17 @@ function variantStyle(variant: PageStateVariant) {
       icon: LoaderCircle,
       title: "text-text",
       desc: "text-text-secondary",
+      actionVariant: "secondary" as const,
     };
   }
 
   return {
     wrapper: "border-border bg-surface",
-    iconWrapper: "bg-info-soft text-info",
+    iconWrapper: "bg-info-soft text-info-on-soft",
     icon: Info,
     title: "text-text",
     desc: "text-text-secondary",
+    actionVariant: "info" as const,
   };
 }
 
@@ -65,29 +71,27 @@ export function PageState({
   const Icon = style.icon;
 
   return (
-    <div className={`max-w-4xl mx-auto border rounded-2xl p-8 text-center ${style.wrapper}`}>
-      <div className={`mx-auto w-11 h-11 rounded-xl flex items-center justify-center mb-3 ${style.iconWrapper}`}>
-        <Icon className={`w-5 h-5 ${variant === "loading" ? "animate-spin" : ""}`} />
+    <div className={`mx-auto max-w-4xl rounded-2xl border p-8 text-center shadow-soft ${style.wrapper}`}>
+      <div className={`mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl ${style.iconWrapper}`}>
+        <Icon className={`h-5 w-5 ${variant === "loading" ? "animate-spin" : ""}`} />
       </div>
       <h2 className={`text-lg font-bold ${style.title}`}>{title}</h2>
       {description && <p className={`text-sm mt-1 ${style.desc}`}>{description}</p>}
 
       {actionLabel && onAction && (
-        <button
+        <Button
           onClick={onAction}
-          className="mt-5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover active:bg-primary-active"
+          variant={style.actionVariant}
+          className="mt-5 rounded-xl px-4"
         >
           {actionLabel}
-        </button>
+        </Button>
       )}
 
       {actionLabel && actionTo && (
-        <Link
-          to={actionTo}
-          className="inline-flex mt-5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-hover active:bg-primary-active"
-        >
-          {actionLabel}
-        </Link>
+        <Button asChild variant={style.actionVariant} className="mt-5 rounded-xl px-4">
+          <Link to={actionTo}>{actionLabel}</Link>
+        </Button>
       )}
     </div>
   );

@@ -169,6 +169,60 @@ def test_publish_requires_at_least_two_rubric_dimensions(client: TestClient, ses
     assert "评价维度" in response.json()["detail"]
 
 
+def test_assignment_create_dedupes_related_subject_ids(client: TestClient, session: Session):
+    teacher = _create_user(session, username="teacher_subject", role=UserRole.TEACHER)
+    main_subject = _create_subject(session, code="science_main", name="科学")
+    related_subject = _create_subject(session, code="math_related", name="数学")
+
+    response = client.post(
+        "/api/v2/assignments/",
+        headers=_headers(teacher.id, teacher.role.value),
+        json={
+            "title": "学科融合任务",
+            "topic": "学科融合任务",
+            "school_stage": "middle",
+            "grade": 7,
+            "main_subject_id": main_subject.id,
+            "related_subject_ids": [main_subject.id, related_subject.id, related_subject.id],
+            "assignment_type": "inquiry",
+            "inquiry_subtype": "survey",
+            "inquiry_depth": "intermediate",
+            "submission_mode": "phased",
+            "duration_weeks": 2,
+        },
+    )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["related_subject_ids"] == [related_subject.id]
+
+
+def test_assignment_create_rejects_conflicting_subtypes(client: TestClient, session: Session):
+    teacher = _create_user(session, username="teacher_conflict", role=UserRole.TEACHER)
+    main_subject = _create_subject(session, code="science_conflict", name="科学")
+
+    response = client.post(
+        "/api/v2/assignments/",
+        headers=_headers(teacher.id, teacher.role.value),
+        json={
+            "title": "冲突子类型",
+            "topic": "冲突子类型",
+            "school_stage": "middle",
+            "grade": 7,
+            "main_subject_id": main_subject.id,
+            "related_subject_ids": [],
+            "assignment_type": "practical",
+            "practical_subtype": "visit",
+            "inquiry_subtype": "survey",
+            "inquiry_depth": "intermediate",
+            "submission_mode": "phased",
+            "duration_weeks": 2,
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_submit_requires_evidence(client: TestClient, session: Session):
     teacher = _create_user(session, username="teacher_c", role=UserRole.TEACHER)
     student = _create_user(session, username="student_c", role=UserRole.STUDENT, grade=7)

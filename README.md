@@ -12,6 +12,7 @@ CDAS 是一套面向 K12 场景的跨学科作业系统，支持教师端作业�
 接口演进规则见：
 
 - [API Contract Governance](frontend/docs/integration/api-contract-governance.md)
+- [2026-03 升级范围裁剪](docs/UPGRADE_SCOPE_2026-03.md)
 
 ## 快速启动
 

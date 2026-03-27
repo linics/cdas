@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.contracts.assignment import AIGenerationMeta
 from app.contracts.common import normalize_optional_text, normalize_trimmed
 from app.models import EvaluationLevel, EvaluationType
 
@@ -98,3 +99,9 @@ class AIEvaluationSuggestion(BaseModel):
     feedback: str = ""
     evidence: List[Dict[str, str]] = Field(default_factory=list)
     action_items: List[str] = Field(default_factory=list)
+
+
+class AIAssistEvaluationResponse(BaseModel):
+    message: str
+    suggestion: AIEvaluationSuggestion
+    meta: Optional[AIGenerationMeta] = None

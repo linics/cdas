@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import re
 from typing import Callable, List, Sequence, TypeVar
+import uuid
 
 import requests
 
@@ -16,6 +17,10 @@ from app.config import Settings, get_settings
 
 
 T = TypeVar("T", bound=BaseModel)
+
+
+def generate_ai_request_id() -> str:
+    return uuid.uuid4().hex[:12]
 
 
 class EmbeddingProvider:
