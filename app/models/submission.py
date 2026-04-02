@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
 from app.db import Base
+from app.models.document import ParsingStatus
 from app.models.enums import EvaluationLevel, EvaluationType, SubmissionStatus
 
 
@@ -72,9 +73,96 @@ class Submission(Base):
     student = relationship("User", foreign_keys=[student_id])
     group = relationship("ProjectGroup", back_populates="submissions")
     evaluations = relationship("Evaluation", back_populates="submission", cascade="all, delete-orphan")
+    attachment_assets = relationship(
+        "SubmissionAttachmentAsset",
+        back_populates="submission",
+        cascade="all, delete-orphan",
+    )
     
     def __repr__(self) -> str:
         return f"<Submission(id={self.id}, assignment_id={self.assignment_id}, phase={self.phase_index})>"
+
+
+class SubmissionAttachmentAsset(Base):
+    """学生上传附件资产。"""
+
+    __tablename__ = "submission_attachment_assets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    submission_id: Mapped[int] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    uploader_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source: Mapped[str] = mapped_column(String(20), default="upload", nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_path: Mapped[str] = mapped_column(String(512), nullable=False)
+    mime_type: Mapped[str | None] = mapped_column(String(100))
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    parsing_status: Mapped[ParsingStatus] = mapped_column(
+        Enum(ParsingStatus),
+        default=ParsingStatus.UPLOADED,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    submission = relationship("Submission", back_populates="attachment_assets")
+    uploader = relationship("User", foreign_keys=[uploader_id])
+    analysis = relationship(
+        "SubmissionAttachmentAnalysis",
+        back_populates="attachment",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+    def __repr__(self) -> str:
+        return f"<SubmissionAttachmentAsset(id={self.id}, submission_id={self.submission_id}, status={self.parsing_status.value})>"
+
+
+class SubmissionAttachmentAnalysis(Base):
+    """学生附件解析结果。"""
+
+    __tablename__ = "submission_attachment_analysis"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    attachment_id: Mapped[int] = mapped_column(
+        ForeignKey("submission_attachment_assets.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    extracted_text: Mapped[str | None] = mapped_column(Text)
+    summary_text: Mapped[str | None] = mapped_column(Text)
+    error_msg: Mapped[str | None] = mapped_column(Text)
+    analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    attachment = relationship("SubmissionAttachmentAsset", back_populates="analysis")
+
+    def __repr__(self) -> str:
+        return f"<SubmissionAttachmentAnalysis(attachment_id={self.attachment_id})>"
 
 
 class Evaluation(Base):
@@ -139,4 +227,3 @@ class Evaluation(Base):
     
     def __repr__(self) -> str:
         return f"<Evaluation(id={self.id}, type={self.evaluation_type.value}, level={self.score_level})>"
-

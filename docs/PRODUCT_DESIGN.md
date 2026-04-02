@@ -74,6 +74,13 @@ CDAS 面向 K12 跨学科作业场景，必须支持教师完成设计、发布�
 
 AI 生成结果 MUST 可编辑，且默认仅形成草稿，不得直接发布。
 
+其中 `从教案一键生成` MUST 满足：
+
+- 教师本次会话中已手动修改的顶层字段可继续作为生成约束
+- 未手动修改的默认顶层字段 SHOULD 允许被教案识别结果替换
+- `objectives_json / phases_json / rubric_json` 每次触发时 SHOULD 按教案重新生成
+- 页面 SHOULD 明确提示哪些字段被更新、哪些字段因教师已修改而保留
+
 ### 3.2 发布与组织
 
 教师发布前，系统 MUST 校验：
@@ -92,6 +99,10 @@ AI 生成结果 MUST 可编辑，且默认仅形成草稿，不得直接发布�
 - 草稿允许多次保存
 - 正式提交前 MUST 至少包含一项证据：文本、附件或已完成 checkpoint
 - 附件链接 MUST 为有效 `http/https` URL
+- 学生附件 MUST 支持“链接附件 + 文件附件”并存
+- 文件附件首版支持 `PDF / DOCX / TXT`
+- 文件附件在状态为 `READY` 前 MUST NOT 用于正式提交
+- 若截止后晚提交仍被允许，系统 SHOULD 允许学生删除会阻塞正式提交的未就绪文件附件
 - `phase_index` / `step_index` MUST 与当前作业结构一致
 
 ### 3.4 教师评价
@@ -107,7 +118,7 @@ AI 生成结果 MUST 可编辑，且默认仅形成草稿，不得直接发布�
 
 ### 4.1 文档输入
 
-系统 MUST 支持 `PDF` / `DOCX` 输入。
+系统 MUST 支持 `PDF` / `DOCX` / `TXT` 输入。
 
 - 文档在状态为 `READY` 前 MUST NOT 参与生成链路
 - 向量库和上传文件属于运行时产物，MUST NOT 进入版本库
@@ -142,6 +153,10 @@ AI 生成结果 MUST 可编辑，且默认仅形成草稿，不得直接发布�
 - `phase_index` / `step_index` 落在 assignment 范围内
 - `checkpoints_json` 只能引用 assignment 已定义的 checkpoint
 - 正式提交时至少有一项证据
+- 链接附件保持 `http/https` 写入约束；文件附件通过独立附件域管理，并以读兼容方式投影到提交响应
+- 若存在文件附件，正式提交前其解析状态 MUST 全部为 `READY`
+- `from-lesson-plan` 请求 SHOULD 传递教师已手动修改的顶层约束字段（如标题、主题、说明、背景、子类型等），使重建内容与保留字段保持一致
+- 对 `from-lesson-plan`，未发送字段表示“允许后端按教案重新推断”；显式发送空字符串表示“教师已清空该文本约束”；`main_subject_id: null` 表示取消教师覆盖并重新推断主学科
 - 小组提交必须验证小组归属与成员身份
 
 ### 5.3 Evaluation

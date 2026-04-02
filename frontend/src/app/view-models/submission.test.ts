@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { AssignmentGroup, Submission } from "../lib/api";
-import { buildGroupProgressRows, buildGroupScoreSummary } from "./submission";
+import type { AssignmentGroup, Submission, SubmissionAttachment } from "../lib/api";
+import {
+  buildSubmissionEditorState,
+  buildGroupProgressRows,
+  buildGroupScoreSummary,
+  mergeSubmissionAttachment,
+  patchSubmissionAttachments,
+  preserveSubmissionEditorContent,
+  removeSubmissionAttachment,
+} from "./submission";
 
 function makeGroup(overrides: Partial<AssignmentGroup> = {}): AssignmentGroup {
   return {
@@ -25,6 +33,18 @@ function makeSubmission(overrides: Partial<Submission> = {}): Submission {
     checkpoints_json: {},
     created_at: "2026-03-27T10:00:00Z",
     submitted_at: "2026-03-27T10:10:00Z",
+    ...overrides,
+  };
+}
+
+function makeAttachment(overrides: Partial<SubmissionAttachment> = {}): SubmissionAttachment {
+  return {
+    filename: "evidence.txt",
+    url: "/api/v2/submissions/1/attachments/1/download",
+    type: "txt",
+    source: "upload",
+    attachment_id: 1,
+    parsing_status: "ready",
     ...overrides,
   };
 }
@@ -155,5 +175,116 @@ describe("submission view models", () => {
     });
 
     expect(rows[0]?.latestSubmission?.id).toBe(2);
+  });
+
+  it("merges uploaded attachment without dropping existing local attachments", () => {
+    const next = mergeSubmissionAttachment(
+      [
+        {
+          filename: "link",
+          url: "https://example.com",
+          type: "link",
+          source: "link",
+        },
+      ],
+      makeAttachment(),
+    );
+
+    expect(next).toHaveLength(2);
+    expect(next[0]?.source).toBe("link");
+    expect(next[1]?.attachment_id).toBe(1);
+  });
+
+  it("removes only the targeted uploaded attachment", () => {
+    const remaining = removeSubmissionAttachment(
+      [
+        makeAttachment(),
+        makeAttachment({
+          attachment_id: 2,
+          filename: "notes.txt",
+          url: "/api/v2/submissions/1/attachments/2/download",
+        }),
+      ],
+      {
+        attachment_id: 1,
+        filename: "evidence.txt",
+        url: "/api/v2/submissions/1/attachments/1/download",
+        source: "upload",
+      },
+    );
+
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.attachment_id).toBe(2);
+  });
+
+  it("patches submission attachments for the active draft only", () => {
+    const patched = patchSubmissionAttachments(
+      [
+        makeSubmission({
+          id: 1,
+          attachments_json: [
+            {
+              filename: "link",
+              url: "https://example.com",
+              type: "link",
+              source: "link",
+            },
+          ],
+        }),
+        makeSubmission({ id: 2 }),
+      ],
+      1,
+      [
+        {
+          filename: "link",
+          url: "https://example.com",
+          type: "link",
+          source: "link",
+        },
+        makeAttachment(),
+      ],
+    );
+
+    expect(patched[0]?.attachments_json).toHaveLength(2);
+    expect(patched[1]?.attachments_json).toEqual([]);
+  });
+
+  it("builds editor state from the latest server submission payload", () => {
+    const editorState = buildSubmissionEditorState(
+      makeSubmission({
+        id: 1,
+        content_json: { text: "服务端最新正文" },
+        attachments_json: [
+          {
+            filename: "updated.txt",
+            url: "/api/v2/submissions/1/attachments/2/download",
+            type: "txt",
+            source: "upload",
+            attachment_id: 2,
+            parsing_status: "ready",
+          },
+        ],
+      }),
+    );
+
+    expect(editorState.contentText).toBe("服务端最新正文");
+    expect(editorState.attachments).toHaveLength(1);
+    expect(editorState.attachments[0]?.attachment_id).toBe(2);
+  });
+
+  it("preserves unsaved content when only local attachments change", () => {
+    const editorState = preserveSubmissionEditorContent("还没保存的正文", [
+      {
+        filename: "link",
+        url: "https://example.com",
+        type: "link",
+        source: "link",
+      },
+      makeAttachment(),
+    ]);
+
+    expect(editorState.contentText).toBe("还没保存的正文");
+    expect(editorState.attachments).toHaveLength(2);
+    expect(editorState.attachments[1]?.attachment_id).toBe(1);
   });
 });

@@ -4,7 +4,7 @@ import { validateAssignmentDesignerForm } from "./assignment";
 import { validateRegisterInput } from "./auth";
 import { validateClassroomName, validateGroupName, validateInviteCode } from "./classroom";
 import { validateTeacherEvaluation } from "./evaluation";
-import { validateKnowledgeFile } from "./knowledge";
+import { validateKnowledgeFile, validateSubmissionAttachmentFile } from "./knowledge";
 import { validateAttachmentDraft, validateSubmissionForSubmit } from "./submission";
 
 describe("validation rules", () => {
@@ -95,15 +95,32 @@ describe("validation rules", () => {
     expect(validateAttachmentDraft("附件", "ftp://bad.example.com")).toBe("附件链接必须为 http/https 地址");
   });
 
+  it("blocks submit when uploaded attachment is not ready", () => {
+    expect(
+      validateSubmissionForSubmit({
+        contentText: "",
+        attachments: [{ filename: "分析材料.txt", url: "/api/v2/x", type: "txt", source: "upload", parsing_status: "failed" }],
+        checkpoints: {},
+      }),
+    ).toBe("附件《分析材料.txt》尚未就绪，请等待解析完成后再提交");
+  });
+
   it("validates invite code and class name", () => {
     expect(validateInviteCode("123")).toBe("邀请码格式无效");
     expect(validateClassroomName("   ")).toBe("请输入班级名称");
   });
 
   it("validates knowledge file extension and size", () => {
-    const badType = new File(["hi"], "demo.txt", { type: "text/plain" });
+    const badType = new File(["hi"], "demo.md", { type: "text/markdown" });
     const bigFile = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "demo.docx");
-    expect(validateKnowledgeFile(badType)).toBe("仅支持上传 PDF、DOC 或 DOCX 文档");
+    expect(validateKnowledgeFile(badType)).toBe("仅支持上传 PDF、DOCX 或 TXT 文档");
     expect(validateKnowledgeFile(bigFile)).toBe("上传文档不能超过 10MB");
+  });
+
+  it("validates submission attachment file extension and size", () => {
+    const badType = new File(["hi"], "demo.md", { type: "text/markdown" });
+    const bigFile = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "demo.pdf", { type: "application/pdf" });
+    expect(validateSubmissionAttachmentFile(badType)).toBe("仅支持上传 PDF、DOCX 或 TXT 附件");
+    expect(validateSubmissionAttachmentFile(bigFile)).toBe("上传附件不能超过 10MB");
   });
 });

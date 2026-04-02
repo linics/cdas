@@ -873,7 +873,18 @@ def _build_lesson_plan_seed(
     document: Document,
     text: str,
     db: Session,
-) -> tuple[AssignmentCreate, Dict[str, Any]]:
+) -> tuple[AssignmentCreate, Dict[str, Any], Dict[str, str], Dict[str, str | None]]:
+    provided_fields = getattr(request_data, "model_fields_set", set())
+
+    def field_provided(name: str) -> bool:
+        return name in provided_fields
+
+    def explicit_text(name: str) -> str | None:
+        if not field_provided(name):
+            return None
+        value = getattr(request_data, name)
+        return value if isinstance(value, str) else None
+
     doc_meta = document.metadata_json or {}
     fallback_subject_id = doc_meta.get("subject_id") if isinstance(doc_meta, dict) else None
     extracted, extract_meta = _extract_lesson_plan_basics_with_ai(text, db, request_data)
@@ -887,8 +898,8 @@ def _build_lesson_plan_seed(
 
     inferred_type = request_data.assignment_type or extracted.get("assignment_type") or _infer_assignment_type(text)
     practical_subtype, inquiry_subtype = _infer_subtypes(inferred_type, text)
-    practical_subtype = extracted.get("practical_subtype") or practical_subtype
-    inquiry_subtype = extracted.get("inquiry_subtype") or inquiry_subtype
+    practical_subtype = request_data.practical_subtype or extracted.get("practical_subtype") or practical_subtype
+    inquiry_subtype = request_data.inquiry_subtype or extracted.get("inquiry_subtype") or inquiry_subtype
     if inferred_type == AssignmentType.PROJECT:
         practical_subtype = None
         inquiry_subtype = None
@@ -901,8 +912,8 @@ def _build_lesson_plan_seed(
         db,
         text,
         inferred_stage,
-        request_data.main_subject_id or extracted.get("main_subject_id"),
-        request_data.related_subject_ids or extracted.get("related_subject_ids") or [],
+        request_data.main_subject_id if field_provided("main_subject_id") else extracted.get("main_subject_id"),
+        request_data.related_subject_ids if field_provided("related_subject_ids") else (extracted.get("related_subject_ids") or []),
         int(fallback_subject_id) if isinstance(fallback_subject_id, int) else None,
     )
 
@@ -918,18 +929,27 @@ def _build_lesson_plan_seed(
         if title_match
         else (heading_title or _clean_filename_stem(document.filename))
     )
-    topic = re.sub(r"^(教案|教学设计|课程设计)\s*", "", title).strip() or title
-    description = _summarize_text(text, max_length=900)
+    response_title = explicit_text("title")
+    effective_title = response_title if response_title else title
+    topic = re.sub(r"^(教案|教学设计|课程设计)\s*", "", effective_title).strip() or effective_title
+    response_topic = explicit_text("topic")
+    effective_topic = response_topic if response_topic else topic
+    response_description = explicit_text("description")
+    description = response_description if response_description is not None else _summarize_text(text, max_length=900)
+    response_background_setting = explicit_text("background_setting")
 
-    duration_weeks = request_data.duration_weeks or extracted.get("duration_weeks") or 2
-    week_match = re.search(r"(\d{1,2})\s*周", text)
-    if week_match:
-        duration_weeks = max(1, min(16, int(week_match.group(1))))
+    if field_provided("duration_weeks"):
+        duration_weeks = request_data.duration_weeks or 2
+    else:
+        duration_weeks = extracted.get("duration_weeks") or 2
+        week_match = re.search(r"(\d{1,2})\s*周", text)
+        if week_match:
+            duration_weeks = max(1, min(16, int(week_match.group(1))))
 
     return (
         AssignmentCreate(
-            title=title,
-            topic=topic,
+            title=effective_title,
+            topic=effective_topic,
             description=description,
             school_stage=inferred_stage,
             grade=inferred_grade,
@@ -948,6 +968,17 @@ def _build_lesson_plan_seed(
             rubric_json=None,
         ),
         extract_meta,
+        {
+            "title": response_title if response_title is not None else effective_title,
+            "topic": response_topic if response_topic is not None else effective_topic,
+            "description": response_description if response_description is not None else (description or ""),
+        },
+        {
+            "title": response_title,
+            "topic": response_topic,
+            "description": response_description,
+            "background_setting": response_background_setting,
+        },
     )
 
 
@@ -1030,16 +1061,27 @@ async def generate_assignment_from_lesson_plan(
     if not lesson_plan_text.strip():
         raise HTTPException(status_code=400, detail="教案内容为空，无法生成草稿")
 
-    seed, extract_meta = _build_lesson_plan_seed(data, document, lesson_plan_text, db)
-    objectives, phases, rubric, meta = _generate_ai_content_from_lesson_plan_with_meta(seed, lesson_plan_text)
+    provided_fields = getattr(data, "model_fields_set", set())
+    requested_background_setting = data.background_setting if "background_setting" in provided_fields else None
+
+    seed, extract_meta, response_overrides, prompt_overrides = _build_lesson_plan_seed(data, document, lesson_plan_text, db)
+    objectives, phases, rubric, meta = _generate_ai_content_from_lesson_plan_with_meta(
+        seed,
+        lesson_plan_text,
+        title_override=prompt_overrides["title"],
+        topic_override=prompt_overrides["topic"],
+        description_override=prompt_overrides["description"],
+        background_setting_override=prompt_overrides["background_setting"],
+    )
     meta["upstream_extract_source"] = extract_meta.get("source")
     meta["upstream_extract_fallback_reason"] = extract_meta.get("fallback_reason")
     objectives, phases, rubric = _ensure_ai_defaults(seed, objectives, phases, rubric)
+    objectives = _apply_requested_background_setting(seed, objectives, requested_background_setting)
 
     return {
-        "title": seed.title,
-        "topic": seed.topic,
-        "description": seed.description or "",
+        "title": response_overrides["title"],
+        "topic": response_overrides["topic"],
+        "description": response_overrides["description"],
         "school_stage": seed.school_stage,
         "grade": seed.grade,
         "main_subject_id": seed.main_subject_id,
@@ -2104,6 +2146,10 @@ def _generate_ai_content(data: AssignmentCreate) -> tuple[Dict[str, Any], List[D
 def _generate_ai_content_from_lesson_plan_with_meta(
     data: AssignmentCreate,
     lesson_plan_text: str,
+    title_override: str | None = None,
+    topic_override: str | None = None,
+    description_override: str | None = None,
+    background_setting_override: str | None = None,
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any], Dict[str, Any]]:
     settings = get_settings()
     client = DeepSeekJSONClient(settings, temperature=0.1, max_output_tokens=2200, request_timeout=75)
@@ -2139,6 +2185,19 @@ def _generate_ai_content_from_lesson_plan_with_meta(
     subject_labels = _resolve_subject_names(subject_ids)
     main_subject_label = subject_labels[0] if subject_labels else f"id={data.main_subject_id}"
     related_subjects_label = ", ".join(subject_labels[1:]) if len(subject_labels) > 1 else "none"
+    subtype_label = "无"
+    if data.assignment_type == AssignmentType.PRACTICAL and data.practical_subtype:
+        subtype_label = {
+            PracticalSubType.VISIT: "参观考察",
+            PracticalSubType.SIMULATION: "模拟表演",
+            PracticalSubType.OBSERVATION: "观察体验",
+        }.get(data.practical_subtype, data.practical_subtype.value)
+    elif data.assignment_type == AssignmentType.INQUIRY and data.inquiry_subtype:
+        subtype_label = {
+            InquirySubType.LITERATURE: "文献探究",
+            InquirySubType.SURVEY: "调查探究",
+            InquirySubType.EXPERIMENT: "实验探究",
+        }.get(data.inquiry_subtype, data.inquiry_subtype.value)
 
     lesson_plan_excerpt, _ = _prepare_prompt_excerpt(
         lesson_plan_text,
@@ -2162,11 +2221,14 @@ def _generate_ai_content_from_lesson_plan_with_meta(
     used_rag = bool((rag_context or "").strip())
 
     prompt_context = LessonPlanPromptContext(
-        title=data.title,
-        topic=data.topic,
+        title=data.title if title_override is None else title_override,
+        topic=data.topic if topic_override is None else topic_override,
+        description=(data.description or "") if description_override is None else description_override,
         school_stage=str(data.school_stage),
         grade=data.grade,
         assignment_type=str(data.assignment_type),
+        subtype=subtype_label,
+        background_setting=(background_setting_override or "") if background_setting_override is not None else "",
         inquiry_depth=str(data.inquiry_depth),
         submission_mode=str(data.submission_mode),
         duration_weeks=data.duration_weeks,
@@ -2253,6 +2315,24 @@ def _generate_ai_content_from_lesson_plan(
 ) -> tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
     objectives, phases, rubric, _meta = _generate_ai_content_from_lesson_plan_with_meta(data, lesson_plan_text)
     return objectives, phases, rubric
+
+
+def _apply_requested_background_setting(
+    data: AssignmentCreate,
+    objectives: Dict[str, Any],
+    background_setting: str | None,
+) -> Dict[str, Any]:
+    if background_setting is None:
+        return objectives
+
+    normalized = dict(objectives or {})
+    background = background_setting.strip()
+    process_text = str(normalized.get("process") or "")
+    _existing_background, process_core = _split_background_and_process(process_text)
+    if not process_core:
+        process_core = _build_process_mainline(data)
+    normalized["process"] = f"背景设定：{background}\n{process_core}" if background else process_core
+    return normalized
 
 
 _ALLOWED_EVIDENCE_TYPES = {"text", "document", "image", "video", "confirm", "link"}

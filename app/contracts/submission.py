@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -32,6 +32,19 @@ class AttachmentSchema(BaseModel):
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError("附件链接必须为 http/https URL")
         return url
+
+
+class SubmissionAttachmentResponse(BaseModel):
+    filename: str
+    url: str
+    type: str
+    size_bytes: Optional[int] = None
+    attachment_id: Optional[int] = None
+    source: Literal["link", "upload"] = "link"
+    parsing_status: Optional[str] = None
+    mime_type: Optional[str] = None
+    error_msg: Optional[str] = None
+    summary_text: Optional[str] = None
 
 
 class SubmissionCreate(BaseModel):
@@ -80,7 +93,7 @@ class SubmissionResponse(BaseModel):
     step_index: Optional[int]
     status: SubmissionStatus
     content_json: Dict[str, Any]
-    attachments_json: List[Dict[str, Any]]
+    attachments_json: List[SubmissionAttachmentResponse]
     checkpoints_json: Dict[str, bool]
     created_at: datetime
     submitted_at: Optional[datetime]
@@ -93,6 +106,11 @@ class SubmissionResponse(BaseModel):
 
 class SubmissionListResponse(BaseModel):
     submissions: List[SubmissionResponse]
+    total: int
+
+
+class SubmissionAttachmentListResponse(BaseModel):
+    attachments: List[SubmissionAttachmentResponse]
     total: int
 
 

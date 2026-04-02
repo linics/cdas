@@ -11,6 +11,7 @@ import {
   assignmentsApi,
   evaluationsApi,
   getApiErrorMessage,
+  normalizeAttachmentUrl,
   submissionsApi,
   type Assignment,
   type AssignmentGroup,
@@ -222,6 +223,18 @@ export function GradingPanel() {
     }
   };
 
+  const openAttachment = async (attachment: Submission["attachments_json"][number]) => {
+    if (attachment.source === "upload") {
+      try {
+        await submissionsApi.downloadAttachment(attachment);
+      } catch (err) {
+        setError(getApiErrorMessage(err, "下载附件失败"));
+      }
+      return;
+    }
+    window.open(normalizeAttachmentUrl(attachment.url), "_blank", "noopener,noreferrer");
+  };
+
   if (!user || user.role !== "teacher") {
     return <PageState variant="warning" title="访问受限" description="仅教师可访问批改页面。" actionLabel="返回学生首页" actionTo="/student" />;
   }
@@ -378,10 +391,32 @@ export function GradingPanel() {
           {submission.attachments_json?.length ? (
             <ul className="space-y-2">
               {submission.attachments_json.map((attachment, index) => (
-                <li key={`${attachment.filename}_${index}`} className="text-sm text-primary">
-                  <a href={attachment.url} target="_blank" rel="noreferrer" className="hover:underline">
-                    {attachment.filename}
-                  </a>
+                <li key={`${attachment.filename}_${index}`} className="rounded-lg border border-border bg-surface px-3 py-2">
+                  {attachment.source === "upload" ? (
+                    <button
+                      type="button"
+                      onClick={() => void openAttachment(attachment)}
+                      className="text-sm text-primary hover:underline text-left"
+                    >
+                      {attachment.filename}
+                    </button>
+                  ) : (
+                    <a
+                      href={normalizeAttachmentUrl(attachment.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      {attachment.filename}
+                    </a>
+                  )}
+                  <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-text-secondary">
+                    <span>{attachment.source === "upload" ? "上传文件" : "附件链接"}</span>
+                    {attachment.parsing_status && <span>状态：{attachment.parsing_status}</span>}
+                    {typeof attachment.size_bytes === "number" && <span>{Math.max(1, Math.round(attachment.size_bytes / 1024))} KB</span>}
+                  </div>
+                  {attachment.summary_text && <p className="mt-1 text-xs text-text-secondary break-words">摘要：{attachment.summary_text}</p>}
+                  {attachment.error_msg && <p className="mt-1 text-xs text-danger break-words">解析失败：{attachment.error_msg}</p>}
                 </li>
               ))}
             </ul>

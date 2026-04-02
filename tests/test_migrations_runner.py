@@ -73,3 +73,11 @@ def test_run_migrations_adds_submission_fields(tmp_path: Path) -> None:
             for row in conn.execute(text("PRAGMA table_info(submissions)")).fetchall()
         }
         assert "student_id" in cols
+        attachment_tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            ).fetchall()
+        }
+        assert "submission_attachment_assets" in attachment_tables
+        assert "submission_attachment_analysis" in attachment_tables

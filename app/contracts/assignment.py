@@ -282,14 +282,27 @@ class AssignmentPreviewResponse(BaseModel):
 
 class LessonPlanDraftRequest(BaseModel):
     document_id: int = Field(gt=0)
+    title: Optional[str] = Field(default=None, max_length=255)
+    topic: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=2000)
+    background_setting: Optional[str] = Field(default=None, max_length=1000)
     school_stage: Optional[SchoolStage] = None
     grade: Optional[int] = Field(default=None, ge=1, le=9)
     main_subject_id: Optional[int] = Field(default=None, gt=0)
     related_subject_ids: List[int] = Field(default_factory=list)
     assignment_type: Optional[AssignmentType] = None
+    practical_subtype: Optional[PracticalSubType] = None
+    inquiry_subtype: Optional[InquirySubType] = None
     inquiry_depth: Optional[InquiryDepth] = None
     submission_mode: Optional[SubmissionMode] = None
     duration_weeks: Optional[int] = Field(default=None, ge=1, le=16)
+
+    @field_validator("title", "topic", "description", "background_setting", mode="before")
+    @classmethod
+    def _normalize_optional_text(cls, value: object) -> Optional[str]:
+        if value is None:
+            return None
+        return str(value).strip()
 
     @field_validator("related_subject_ids", mode="before")
     @classmethod
@@ -297,6 +310,22 @@ class LessonPlanDraftRequest(BaseModel):
         if isinstance(value, list):
             return normalize_int_list(value)
         return []
+
+    @model_validator(mode="after")
+    def _validate_type_combination(self) -> "LessonPlanDraftRequest":
+        if self.assignment_type is None and (
+            self.practical_subtype is not None or self.inquiry_subtype is not None
+        ):
+            raise ValueError("设置实践/探究子类型时必须同时指定作业类型")
+        if self.assignment_type == AssignmentType.PRACTICAL and self.inquiry_subtype is not None:
+            raise ValueError("实践类作业不能设置 inquiry_subtype")
+        if self.assignment_type == AssignmentType.INQUIRY and self.practical_subtype is not None:
+            raise ValueError("探究类作业不能设置 practical_subtype")
+        if self.assignment_type == AssignmentType.PROJECT and (
+            self.practical_subtype is not None or self.inquiry_subtype is not None
+        ):
+            raise ValueError("项目式作业不能设置实践/探究子类型")
+        return self
 
 
 class LessonPlanDraftResponse(BaseModel):

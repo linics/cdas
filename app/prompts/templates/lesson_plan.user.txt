@@ -3,9 +3,12 @@
 输入概况：
 - 标题：{title}
 - 主题：{topic}
+- 作业说明：{description}
 - 学段：{school_stage}
 - 年级：{grade}
 - 作业类型：{assignment_type}
+- 子类型：{subtype}
+- 任务背景约束：{background_setting}
 - 探究深度：{inquiry_depth}
 - 提交模式：{submission_mode}
 - 周期：{duration_weeks} 周
