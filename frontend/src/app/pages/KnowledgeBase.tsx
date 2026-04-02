@@ -188,7 +188,13 @@ export function KnowledgeBase() {
           <p className="text-sm text-text-secondary">课程标准文档 + 自定义教学资料统一管理。</p>
         </div>
         <div className="flex items-center gap-3">
-          <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={handleUpload} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={handleUpload}
+          />
           <button
             onClick={handleChooseFile}
             disabled={uploading}

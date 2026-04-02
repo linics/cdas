@@ -459,3 +459,711 @@ def test_from_lesson_plan_uses_valid_compacted_template_json(client, session, tm
     assert response.status_code == 200
     assert json.loads(captured["template_json"])
     assert "template_json_truncated" in response.json()["meta"]["warnings"]
+
+
+def test_from_lesson_plan_respects_explicitly_cleared_text_constraints(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_clear_text")
+        subject = _create_subject(session, code="science_clear_text", name="科学")
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 2,
+                        "main_subject": "科学",
+                        "related_subjects": ["语文"],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "背景设定：教案里的原始背景\n行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+
+        lesson_plan_path = tmp_path / "lesson-plan-clear-text.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-clear-text.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "title": "",
+                "topic": "",
+                "description": "",
+                "background_setting": "",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == ""
+        assert data["topic"] == ""
+        assert data["description"] == ""
+        assert data["objectives_json"]["process"] == "行动主线：完成调查与方案设计"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_uses_cleared_title_topic_in_prompt_context(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_clear_prompt_context")
+        subject = _create_subject(session, code="science_clear_prompt_context", name="科学")
+        captured: dict[str, str] = {}
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 2,
+                        "main_subject": "科学",
+                        "related_subjects": [],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        def fake_build_prompt(ctx):
+            captured["title"] = ctx.title
+            captured["topic"] = ctx.topic
+            captured["description"] = ctx.description
+            captured["background_setting"] = ctx.background_setting
+            return "system", "user"
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+        monkeypatch.setattr(assignments_api, "build_lesson_plan_prompt", fake_build_prompt)
+
+        lesson_plan_path = tmp_path / "lesson-plan-clear-prompt-context.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-clear-prompt-context.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "title": "",
+                "topic": "",
+                "description": "",
+                "background_setting": "",
+            },
+        )
+
+        assert response.status_code == 200
+        assert captured["title"] == ""
+        assert captured["topic"] == ""
+        assert captured["description"] == ""
+        assert captured["background_setting"] == ""
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_treats_null_text_constraints_as_omitted(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_null_text")
+        subject = _create_subject(session, code="science_null_text", name="科学")
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 2,
+                        "main_subject": "科学",
+                        "related_subjects": [],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "背景设定：教案里的原始背景\n行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+
+        lesson_plan_path = tmp_path / "lesson-plan-null-text.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-null-text.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        baseline_response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={"document_id": document.id},
+        )
+        assert baseline_response.status_code == 200
+        baseline_data = baseline_response.json()
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "title": None,
+                "topic": None,
+                "description": None,
+                "background_setting": None,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["title"] == baseline_data["title"]
+        assert data["topic"] == baseline_data["topic"]
+        assert data["description"] == baseline_data["description"]
+        assert data["objectives_json"]["process"] == baseline_data["objectives_json"]["process"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_omits_null_text_constraints_from_prompt_context(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_null_prompt_context")
+        subject = _create_subject(session, code="science_null_prompt_context", name="科学")
+        captured: dict[str, str] = {}
+        baseline_captured: dict[str, str] = {}
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 2,
+                        "main_subject": "科学",
+                        "related_subjects": [],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        def fake_build_prompt(ctx):
+            target = baseline_captured if not baseline_captured else captured
+            target["title"] = ctx.title
+            target["topic"] = ctx.topic
+            target["description"] = ctx.description
+            target["background_setting"] = ctx.background_setting
+            return "system", "user"
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+        monkeypatch.setattr(assignments_api, "build_lesson_plan_prompt", fake_build_prompt)
+
+        lesson_plan_path = tmp_path / "lesson-plan-null-prompt-context.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-null-prompt-context.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        baseline_response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={"document_id": document.id},
+        )
+        assert baseline_response.status_code == 200
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "title": None,
+                "topic": None,
+                "description": None,
+                "background_setting": None,
+            },
+        )
+
+        assert response.status_code == 200
+        assert captured["title"] == baseline_captured["title"]
+        assert captured["topic"] == baseline_captured["topic"]
+        assert captured["description"] == baseline_captured["description"]
+        assert captured["background_setting"] == baseline_captured["background_setting"]
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_null_main_subject_reverts_to_inferred_subject(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_null_subject")
+        subject = _create_subject(session, code="science_null_subject", name="科学")
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 2,
+                        "main_subject": "科学",
+                        "related_subjects": [],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+
+        lesson_plan_path = tmp_path / "lesson-plan-null-subject.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-null-subject.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "main_subject_id": None,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["main_subject_id"] == subject.id
+        assert data["title"] == "校园节水项目"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_preserves_touched_duration_weeks(client, session, tmp_path, monkeypatch):
+    try:
+        teacher = _create_teacher(session, username="lesson_teacher_duration_weeks")
+        subject = _create_subject(session, code="science_duration_weeks", name="科学")
+
+        class FakeLessonPlanClient:
+            def __init__(self, *_args, **_kwargs):
+                self.is_available = True
+
+            def predict_json(self, _system_prompt: str, user_prompt: str):
+                if "提取字段" in user_prompt:
+                    return {
+                        "school_stage": "middle",
+                        "grade": 7,
+                        "assignment_type": "project",
+                        "inquiry_depth": "intermediate",
+                        "submission_mode": "phased",
+                        "duration_weeks": 3,
+                        "main_subject": "科学",
+                        "related_subjects": [],
+                    }
+                return {
+                    "objectives": {
+                        "knowledge": "理解校园节水问题",
+                        "process": "行动主线：完成调查与方案设计",
+                        "emotion": "建立节水责任感",
+                    },
+                    "phases": [
+                        {
+                            "name": "阶段一",
+                            "order": 1,
+                            "steps": [
+                                {
+                                    "name": "收集资料",
+                                    "description": "记录校园用水现状",
+                                    "checkpoints": [{"content": "提交调查记录", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                        {
+                            "name": "阶段二",
+                            "order": 2,
+                            "steps": [
+                                {
+                                    "name": "形成方案",
+                                    "description": "提交改进建议",
+                                    "checkpoints": [{"content": "提交方案草稿", "evidence_type": "document"}],
+                                }
+                            ],
+                        },
+                    ],
+                    "rubric": {"dimensions": [{"name": "问题意识"}, {"name": "证据质量"}]},
+                }
+
+        monkeypatch.setattr(assignments_api, "DeepSeekJSONClient", FakeLessonPlanClient)
+
+        lesson_plan_path = tmp_path / "lesson-plan-duration-weeks.txt"
+        lesson_plan_path.write_text(
+            "\n".join(
+                [
+                    "教案名称：校园节水项目",
+                    "课题：校园节水项目",
+                    "初中七年级科学",
+                    "项目式作业",
+                    "周期：3周",
+                    "调查学生节水行为并提出改进建议。",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        document = Document(
+            filename="lesson-plan-duration-weeks.txt",
+            file_path=str(lesson_plan_path),
+            mime_type="text/plain",
+            parsing_status=ParsingStatus.READY,
+            metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+            source="user",
+        )
+        session.add(document)
+        session.commit()
+        session.refresh(document)
+
+        response = client.post(
+            "/api/v2/assignments/from-lesson-plan",
+            headers=_headers(teacher.id, teacher.role.value),
+            json={
+                "document_id": document.id,
+                "duration_weeks": 5,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["duration_weeks"] == 5
+    finally:
+        get_settings.cache_clear()
+
+
+def test_from_lesson_plan_rejects_practical_subtype_without_assignment_type(client, session, tmp_path):
+    teacher = _create_teacher(session, username="lesson_teacher_practical_subtype_only")
+    subject = _create_subject(session, code="science_practical_subtype_only", name="科学")
+    lesson_plan_path = tmp_path / "lesson-plan-practical-subtype-only.txt"
+    lesson_plan_path.write_text("初中七年级科学教案", encoding="utf-8")
+
+    document = Document(
+        filename="lesson-plan-practical-subtype-only.txt",
+        file_path=str(lesson_plan_path),
+        mime_type="text/plain",
+        parsing_status=ParsingStatus.READY,
+        metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+        source="user",
+    )
+    session.add(document)
+    session.commit()
+    session.refresh(document)
+
+    response = client.post(
+        "/api/v2/assignments/from-lesson-plan",
+        headers=_headers(teacher.id, teacher.role.value),
+        json={
+            "document_id": document.id,
+            "practical_subtype": "visit",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "作业类型" in response.text
+
+
+def test_from_lesson_plan_rejects_inquiry_subtype_without_assignment_type(client, session, tmp_path):
+    teacher = _create_teacher(session, username="lesson_teacher_inquiry_subtype_only")
+    subject = _create_subject(session, code="science_inquiry_subtype_only", name="科学")
+    lesson_plan_path = tmp_path / "lesson-plan-inquiry-subtype-only.txt"
+    lesson_plan_path.write_text("初中七年级科学教案", encoding="utf-8")
+
+    document = Document(
+        filename="lesson-plan-inquiry-subtype-only.txt",
+        file_path=str(lesson_plan_path),
+        mime_type="text/plain",
+        parsing_status=ParsingStatus.READY,
+        metadata_json={"subject_id": subject.id, "subject_name": subject.name},
+        source="user",
+    )
+    session.add(document)
+    session.commit()
+    session.refresh(document)
+
+    response = client.post(
+        "/api/v2/assignments/from-lesson-plan",
+        headers=_headers(teacher.id, teacher.role.value),
+        json={
+            "document_id": document.id,
+            "inquiry_subtype": "survey",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "作业类型" in response.text

@@ -35,6 +35,8 @@ def create_app() -> FastAPI:
             ProjectGroup,
             Subject,
             Submission,
+            SubmissionAttachmentAnalysis,
+            SubmissionAttachmentAsset,
             User,
         )
 

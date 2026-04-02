@@ -1,35 +1,44 @@
 """作业提交API。"""
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.contracts.submission import (
-    AssignmentBrief,
-    AttachmentSchema,
     SubmissionCreate,
+    SubmissionAttachmentListResponse,
     SubmissionListResponse,
     SubmissionResponse,
     SubmissionUpdate,
     normalize_submission_text,
 )
+from app.config import get_settings
 from app.db import get_db
 from app.models import (
+    Assignment,
     Evaluation,
     EvaluationType,
-    Submission,
-    Assignment,
+    ParsingStatus,
     ProjectGroup,
-    User,
-    SubmissionStatus,
+    Submission,
+    SubmissionAttachmentAsset,
     SubmissionMode,
+    SubmissionStatus,
+    User,
 )
 from app.api.v2.auth import get_current_user, require_student
+from app.services.submission_attachments import SubmissionAttachmentService
 
 router = APIRouter()
+
+
+def _attachment_service() -> SubmissionAttachmentService:
+    return SubmissionAttachmentService(get_settings())
 
 
 # === Helpers ===
@@ -97,6 +106,23 @@ def _student_has_submission_access(db: Session, submission: Submission, student_
     if not group:
         return False
     return student_id in _extract_member_ids(group.members_json or [])
+
+
+def _teacher_has_submission_access(db: Session, submission: Submission, teacher_id: int) -> bool:
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        return False
+    return assignment.created_by == teacher_id
+
+
+def _user_can_access_submission(db: Session, submission: Submission, current_user: User) -> bool:
+    from app.models.user import UserRole
+
+    if current_user.role == UserRole.STUDENT:
+        return _student_has_submission_access(db, submission, current_user.id)
+    if current_user.role == UserRole.TEACHER:
+        return _teacher_has_submission_access(db, submission, current_user.id)
+    return False
 
 
 def _validate_group_submission_target(
@@ -216,11 +242,94 @@ def _build_teacher_evaluated_at_map(
     return latest_map
 
 
+def _attachment_download_url(submission_id: int, attachment_id: int) -> str:
+    return f"/api/v2/submissions/{submission_id}/attachments/{attachment_id}/download"
+
+
+def _project_link_attachment(item: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "filename": item.get("filename") or "",
+        "url": item.get("url") or "",
+        "type": item.get("type") or "link",
+        "size_bytes": item.get("size_bytes"),
+        "source": "link",
+        "parsing_status": ParsingStatus.READY.value,
+        "mime_type": item.get("mime_type"),
+        "error_msg": item.get("error_msg"),
+        "summary_text": item.get("summary_text"),
+    }
+
+
+def _project_uploaded_attachment(asset: SubmissionAttachmentAsset) -> Dict[str, Any]:
+    suffix = Path(asset.original_filename).suffix.lower().lstrip(".")
+    analysis = asset.analysis
+    return {
+        "filename": asset.original_filename,
+        "url": _attachment_download_url(asset.submission_id, asset.id),
+        "type": suffix or "file",
+        "size_bytes": asset.size_bytes,
+        "attachment_id": asset.id,
+        "source": "upload",
+        "parsing_status": asset.parsing_status.value,
+        "mime_type": asset.mime_type,
+        "error_msg": analysis.error_msg if analysis else None,
+        "summary_text": analysis.summary_text if analysis else None,
+    }
+
+
+def _build_attachment_context_map(
+    db: Session,
+    submission_ids: List[int],
+) -> Dict[int, List[Dict[str, Any]]]:
+    if not submission_ids:
+        return {}
+
+    assets = (
+        db.query(SubmissionAttachmentAsset)
+        .options(joinedload(SubmissionAttachmentAsset.analysis))
+        .filter(SubmissionAttachmentAsset.submission_id.in_(submission_ids))
+        .order_by(SubmissionAttachmentAsset.created_at.asc())
+        .all()
+    )
+    context: Dict[int, List[Dict[str, Any]]] = {}
+    for asset in assets:
+        context.setdefault(asset.submission_id, []).append(_project_uploaded_attachment(asset))
+    return context
+
+
+def _validate_uploaded_attachments_ready(db: Session, submission_id: int) -> None:
+    assets = (
+        db.query(SubmissionAttachmentAsset)
+        .filter(SubmissionAttachmentAsset.submission_id == submission_id)
+        .all()
+    )
+    pending = [asset for asset in assets if asset.parsing_status != ParsingStatus.READY]
+    if not pending:
+        return
+
+    failed = next((asset for asset in pending if asset.parsing_status == ParsingStatus.FAILED), pending[0])
+    raise HTTPException(
+        status_code=400,
+        detail=f"附件「{failed.original_filename}」尚未就绪，请先处理为 ready 后再正式提交",
+    )
+
+
+def _has_uploaded_attachments(db: Session, submission_id: int) -> bool:
+    return (
+        db.query(SubmissionAttachmentAsset.id)
+        .filter(SubmissionAttachmentAsset.submission_id == submission_id)
+        .first()
+        is not None
+    )
+
+
 def _serialize_submission(
     submission: Submission,
     group_context: Optional[Dict[str, Any]] = None,
     teacher_evaluated_at: Optional[datetime] = None,
+    projected_attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
+    link_attachments = [_project_link_attachment(item) for item in (submission.attachments_json or [])]
     payload = {
         "id": submission.id,
         "assignment_id": submission.assignment_id,
@@ -232,7 +341,7 @@ def _serialize_submission(
         "step_index": submission.step_index,
         "status": _normalize_status(submission.status),
         "content_json": submission.content_json or {},
-        "attachments_json": submission.attachments_json or [],
+        "attachments_json": link_attachments + (projected_attachments or []),
         "checkpoints_json": submission.checkpoints_json or {},
         "created_at": submission.created_at,
         "submitted_at": submission.submitted_at,
@@ -311,7 +420,121 @@ def _has_submission_evidence(
     return False
 
 
+def _get_submission_or_404(db: Session, submission_id: int) -> Submission:
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="提交不存在")
+    return submission
+
+
+def _get_attachment_or_404(db: Session, submission_id: int, attachment_id: int) -> SubmissionAttachmentAsset:
+    asset = _attachment_service().get_for_submission(db, submission_id, attachment_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    return asset
+
+
+def _is_past_deadline(deadline: datetime | None) -> bool:
+    if deadline is None:
+        return False
+    normalized_deadline = deadline if deadline.tzinfo is not None else deadline.replace(tzinfo=timezone.utc)
+    return datetime.now(timezone.utc) > normalized_deadline
+
+
+def _get_editable_submission(
+    db: Session,
+    submission_id: int,
+    student_id: int,
+    *,
+    draft_only_detail: str | None = None,
+) -> tuple[Submission, Assignment | None]:
+    submission = _get_submission_or_404(db, submission_id)
+    if not _student_has_submission_access(db, submission, student_id):
+        raise HTTPException(status_code=403, detail="只能修改自己或所在小组的提交")
+    if draft_only_detail is not None:
+        if submission.status != SubmissionStatus.DRAFT:
+            raise HTTPException(status_code=400, detail=draft_only_detail)
+    elif submission.status == SubmissionStatus.GRADED:
+        raise HTTPException(status_code=400, detail="已评分的提交不能修改")
+
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if assignment is not None and _is_past_deadline(assignment.deadline):
+        raise HTTPException(status_code=400, detail="已过截止时间，不能修改")
+
+    return submission, assignment
+
+
 # === API 端点 ===
+
+@router.post("/{submission_id}/attachments/upload")
+async def upload_submission_attachment(
+    submission_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    submission, _assignment = _get_editable_submission(
+        db,
+        submission_id,
+        current_user.id,
+        draft_only_detail="只能在草稿状态上传附件",
+    )
+
+    asset = await _attachment_service().handle_upload(db, submission, file, current_user.id)
+    asset = _get_attachment_or_404(db, submission.id, asset.id)
+    return _project_uploaded_attachment(asset)
+
+
+@router.get("/{submission_id}/attachments", response_model=SubmissionAttachmentListResponse)
+async def list_submission_attachments(
+    submission_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = _get_submission_or_404(db, submission_id)
+    if not _user_can_access_submission(db, submission, current_user):
+        raise HTTPException(status_code=403, detail="无权查看该提交附件")
+
+    assets = _attachment_service().list_for_submission(db, submission_id)
+    projected = [_project_uploaded_attachment(asset) for asset in assets]
+    return {"attachments": projected, "total": len(projected)}
+
+
+@router.get("/{submission_id}/attachments/{attachment_id}/download")
+async def download_submission_attachment(
+    submission_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    submission = _get_submission_or_404(db, submission_id)
+    if not _user_can_access_submission(db, submission, current_user):
+        raise HTTPException(status_code=403, detail="无权下载该附件")
+    asset = _get_attachment_or_404(db, submission_id, attachment_id)
+    path = Path(asset.storage_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="附件文件不存在")
+    return FileResponse(path, media_type=asset.mime_type or "application/octet-stream", filename=asset.original_filename)
+
+
+@router.delete("/{submission_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_submission_attachment(
+    submission_id: int,
+    attachment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    submission = _get_submission_or_404(db, submission_id)
+    if not _student_has_submission_access(db, submission, current_user.id):
+        raise HTTPException(status_code=403, detail="只能修改自己或所在小组的提交")
+    if submission.status != SubmissionStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="只能删除草稿状态的附件")
+    asset = _get_attachment_or_404(db, submission_id, attachment_id)
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if assignment is not None and _is_past_deadline(assignment.deadline):
+        if asset.parsing_status == ParsingStatus.READY:
+            raise HTTPException(status_code=400, detail="已过截止时间，不能修改")
+    _attachment_service().delete(db, asset)
 
 @router.post("/", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
 async def create_submission(
@@ -354,10 +577,12 @@ async def create_submission(
         )
         if existing_group_submission:
             evaluated_at_map = _build_teacher_evaluated_at_map(db, [existing_group_submission.id])
+            attachment_context_map = _build_attachment_context_map(db, [existing_group_submission.id])
             return _serialize_submission(
                 existing_group_submission,
                 group_context,
                 teacher_evaluated_at=evaluated_at_map.get(existing_group_submission.id),
+                projected_attachments=attachment_context_map.get(existing_group_submission.id),
             )
     
     submission = Submission(
@@ -377,10 +602,12 @@ async def create_submission(
     if submission.group_id and group_context is None:
         group_context = _build_group_context_map(db, [submission.group_id]).get(submission.group_id)
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [submission.id])
+    attachment_context_map = _build_attachment_context_map(db, [submission.id])
     return _serialize_submission(
         submission,
         group_context,
         teacher_evaluated_at=evaluated_at_map.get(submission.id),
+        projected_attachments=attachment_context_map.get(submission.id),
     )
 
 
@@ -422,6 +649,7 @@ async def list_my_submissions(
         [item.group_id for item in dedup_submissions if item.group_id is not None],
     )
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [item.id for item in dedup_submissions])
+    attachment_context_map = _build_attachment_context_map(db, [item.id for item in dedup_submissions])
 
     # 手动构造响应以包含嵌套的 assignment 信息
     result = []
@@ -432,6 +660,7 @@ async def list_my_submissions(
                 sub,
                 group_context,
                 teacher_evaluated_at=evaluated_at_map.get(sub.id),
+                projected_attachments=attachment_context_map.get(sub.id),
             ),
             "assignment": {
                 "id": sub.assignment.id,
@@ -454,16 +683,8 @@ async def get_submission(
     current_user: User = Depends(get_current_user)
 ):
     """Get submission detail."""
-    submission = (
-        db.query(Submission)
-        .filter(Submission.id == submission_id)
-        .first()
-    )
-    if not submission:
-        raise HTTPException(status_code=404, detail="提交不存在")
-
-    from app.models.user import UserRole
-    if current_user.role == UserRole.STUDENT and not _student_has_submission_access(db, submission, current_user.id):
+    submission = _get_submission_or_404(db, submission_id)
+    if not _user_can_access_submission(db, submission, current_user):
         raise HTTPException(status_code=403, detail="无权查看该提交")
 
     assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
@@ -471,12 +692,14 @@ async def get_submission(
     if submission.group_id:
         group_context = _build_group_context_map(db, [submission.group_id]).get(submission.group_id)
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [submission.id])
+    attachment_context_map = _build_attachment_context_map(db, [submission.id])
 
     return {
         **_serialize_submission(
             submission,
             group_context,
             teacher_evaluated_at=evaluated_at_map.get(submission.id),
+            projected_attachments=attachment_context_map.get(submission.id),
         ),
         "assignment": {
             "id": assignment.id,
@@ -496,20 +719,9 @@ async def update_submission(
     current_user: User = Depends(require_student)
 ):
     """更新提交（截止前）。"""
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(status_code=404, detail="提交不存在")
-    if not _student_has_submission_access(db, submission, current_user.id):
-        raise HTTPException(status_code=403, detail="只能修改自己或所在小组的提交")
-    if submission.status == SubmissionStatus.GRADED:
-        raise HTTPException(status_code=400, detail="已评分的提交不能修改")
-    
-    # 检查截止时间
-    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    submission, assignment = _get_editable_submission(db, submission_id, current_user.id)
+
     if assignment is not None:
-        deadline = assignment.deadline
-        if deadline and datetime.now(timezone.utc) > deadline:
-            raise HTTPException(status_code=400, detail="已过截止时间，不能修改")
         _validate_submission_indices(assignment, submission.phase_index, submission.step_index)
     
     update_data = data.model_dump(exclude_unset=True)
@@ -527,10 +739,12 @@ async def update_submission(
     if submission.group_id:
         group_context = _build_group_context_map(db, [submission.group_id]).get(submission.group_id)
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [submission.id])
+    attachment_context_map = _build_attachment_context_map(db, [submission.id])
     return _serialize_submission(
         submission,
         group_context,
         teacher_evaluated_at=evaluated_at_map.get(submission.id),
+        projected_attachments=attachment_context_map.get(submission.id),
     )
 
 
@@ -552,11 +766,13 @@ async def submit_submission(
         raise HTTPException(status_code=404, detail="作业不存在")
     _validate_submission_indices(assignment, submission.phase_index, submission.step_index)
     _validate_checkpoint_payload(assignment, submission.checkpoints_json or {})
-    if not _has_submission_evidence(
+    _validate_uploaded_attachments_ready(db, submission.id)
+    has_evidence = _has_submission_evidence(
         submission.content_json or {},
         submission.attachments_json or [],
         submission.checkpoints_json or {},
-    ):
+    ) or _has_uploaded_attachments(db, submission.id)
+    if not has_evidence:
         raise HTTPException(status_code=400, detail="正式提交前至少需要一项证据（文本、附件或检查点）")
     
     submission.status = SubmissionStatus.SUBMITTED
@@ -609,10 +825,12 @@ async def submit_submission(
     if submission.group_id:
         group_context = _build_group_context_map(db, [submission.group_id]).get(submission.group_id)
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [submission.id])
+    attachment_context_map = _build_attachment_context_map(db, [submission.id])
     payload = _serialize_submission(
         submission,
         group_context,
         teacher_evaluated_at=evaluated_at_map.get(submission.id),
+        projected_attachments=attachment_context_map.get(submission.id),
     )
     payload["next_submission_id"] = next_submission_id
     return payload
@@ -632,7 +850,8 @@ async def delete_submission(
         raise HTTPException(status_code=403, detail="只能删除自己或所在小组的提交")
     if submission.status != SubmissionStatus.DRAFT:
         raise HTTPException(status_code=400, detail="只能删除草稿状态的提交")
-    
+
+    _attachment_service().delete_for_submission(db, submission.id)
     db.delete(submission)
     db.commit()
 
@@ -672,11 +891,13 @@ async def list_assignment_submissions(
         [item.group_id for item in submissions if item.group_id is not None],
     )
     evaluated_at_map = _build_teacher_evaluated_at_map(db, [item.id for item in submissions])
+    attachment_context_map = _build_attachment_context_map(db, [item.id for item in submissions])
     result = [
         _serialize_submission(
             item,
             group_context_map.get(item.group_id) if item.group_id else None,
             teacher_evaluated_at=evaluated_at_map.get(item.id),
+            projected_attachments=attachment_context_map.get(item.id),
         )
         for item in submissions
     ]

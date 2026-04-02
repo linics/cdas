@@ -2,6 +2,7 @@ import type {
   AIGenerationMeta,
   Assignment,
   AssignmentCreatePayload,
+  AssignmentLessonPlanDraftRequest,
   AssignmentLessonPlanDraftResponse,
   AssignmentPreviewResponse,
   AssignmentType,
@@ -47,6 +48,73 @@ export interface AssignmentDesignerPreviewState {
   rubric_dimensions: string[];
   meta?: AIGenerationMeta;
 }
+
+export type AssignmentDesignerTouchedField =
+  | "title"
+  | "topic"
+  | "description"
+  | "background_setting"
+  | "school_stage"
+  | "grade"
+  | "main_subject_id"
+  | "related_subject_ids"
+  | "assignment_type"
+  | "practical_subtype"
+  | "inquiry_subtype"
+  | "inquiry_depth"
+  | "submission_mode"
+  | "duration_weeks";
+
+export type AssignmentDesignerTouchedFields = Partial<Record<AssignmentDesignerTouchedField, boolean>>;
+
+export type LessonPlanApplyField = AssignmentDesignerTouchedField | "background_setting";
+export type LessonPlanRegeneratedSection = "objectives" | "steps" | "rubric";
+
+export interface LessonPlanApplySummary {
+  updatedFields: LessonPlanApplyField[];
+  preservedFields: AssignmentDesignerTouchedField[];
+  regeneratedSections: LessonPlanRegeneratedSection[];
+}
+
+const LESSON_PLAN_TOUCHED_FIELDS: AssignmentDesignerTouchedField[] = [
+  "title",
+  "topic",
+  "description",
+  "background_setting",
+  "school_stage",
+  "grade",
+  "main_subject_id",
+  "related_subject_ids",
+  "assignment_type",
+  "practical_subtype",
+  "inquiry_subtype",
+  "inquiry_depth",
+  "submission_mode",
+  "duration_weeks",
+];
+
+const LESSON_PLAN_FIELD_LABELS: Record<LessonPlanApplyField, string> = {
+  title: "标题",
+  topic: "主题",
+  description: "作业说明",
+  background_setting: "任务背景",
+  school_stage: "学段",
+  grade: "年级",
+  main_subject_id: "主学科",
+  related_subject_ids: "融合学科",
+  assignment_type: "作业类型",
+  practical_subtype: "实践子类型",
+  inquiry_subtype: "探究子类型",
+  inquiry_depth: "探究深度",
+  submission_mode: "提交模式",
+  duration_weeks: "作业周期",
+};
+
+const LESSON_PLAN_SECTION_LABELS: Record<LessonPlanRegeneratedSection, string> = {
+  objectives: "目标",
+  steps: "步骤",
+  rubric: "量规",
+};
 
 const DEFAULT_STEPS: LessonStepDraft[] = [
   {
@@ -228,6 +296,20 @@ export function pickOrKeep<T>(nextValue: T | null | undefined, currentValue: T):
   return nextValue;
 }
 
+function hasMeaningfulValue(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return value > 0;
+  if (Array.isArray(value)) return true;
+  return true;
+}
+
+function pushUnique<T>(items: T[], value: T): void {
+  if (!items.includes(value)) {
+    items.push(value);
+  }
+}
+
 export function mergeRelatedSubjectIds(nextIds: number[] | undefined, currentIds: number[], mainSubjectId: number): number[] {
   const source = nextIds && nextIds.length ? nextIds : currentIds;
   const seen = new Set<number>();
@@ -238,6 +320,59 @@ export function mergeRelatedSubjectIds(nextIds: number[] | undefined, currentIds
     merged.push(id);
   }
   return merged;
+}
+
+export function isLessonPlanTouchedField(key: keyof AssignmentDesignerForm): key is AssignmentDesignerTouchedField {
+  return LESSON_PLAN_TOUCHED_FIELDS.includes(key as AssignmentDesignerTouchedField);
+}
+
+export function buildLessonPlanDraftRequest(
+  form: AssignmentDesignerForm,
+  referenceDocumentId: number,
+  touchedFields: AssignmentDesignerTouchedFields,
+): AssignmentLessonPlanDraftRequest {
+  const payload: AssignmentLessonPlanDraftRequest = {
+    document_id: referenceDocumentId,
+  };
+  const shouldIncludeAssignmentType =
+    touchedFields.assignment_type || touchedFields.practical_subtype || touchedFields.inquiry_subtype;
+
+  if (shouldIncludeAssignmentType) {
+    payload.assignment_type = form.assignment_type;
+  }
+
+  for (const field of LESSON_PLAN_TOUCHED_FIELDS) {
+    if (!touchedFields[field]) {
+      continue;
+    }
+    if (field === "title" || field === "topic" || field === "description" || field === "background_setting") {
+      payload[field] = form[field].trim();
+      continue;
+    }
+    if (field === "main_subject_id") {
+      payload.main_subject_id = form.main_subject_id > 0 ? form.main_subject_id : null;
+      continue;
+    }
+    if (field === "related_subject_ids") {
+      payload.related_subject_ids = [...form.related_subject_ids];
+      continue;
+    }
+    if (field === "practical_subtype") {
+      if (form.assignment_type === "practical") {
+        payload.practical_subtype = form.practical_subtype;
+      }
+      continue;
+    }
+    if (field === "inquiry_subtype") {
+      if (form.assignment_type === "inquiry") {
+        payload.inquiry_subtype = form.inquiry_subtype;
+      }
+      continue;
+    }
+    payload[field] = form[field] as never;
+  }
+
+  return payload;
 }
 
 export function buildDesignerInitialForm(): AssignmentDesignerForm {
@@ -351,41 +486,109 @@ export function mergeDesignerFormWithPreview(
 export function mergeDesignerFormWithLessonPlanDraft(
   current: AssignmentDesignerForm,
   draft: AssignmentLessonPlanDraftResponse,
+  touchedFields: AssignmentDesignerTouchedFields = {},
 ): AssignmentDesignerForm {
+  return applyLessonPlanDraft(current, draft, touchedFields).form;
+}
+
+export function applyLessonPlanDraft(
+  current: AssignmentDesignerForm,
+  draft: AssignmentLessonPlanDraftResponse,
+  touchedFields: AssignmentDesignerTouchedFields = {},
+): { form: AssignmentDesignerForm; summary: LessonPlanApplySummary } {
   const processParts = splitBackgroundFromProcess(draft.objectives_json?.process || "");
   const steps = phasesToLessonSteps(draft.phases_json);
   const rubricDimensions =
     draft.rubric_json?.dimensions?.map((item) => item.name).filter(Boolean) || defaultRubricNames(draft.assignment_type);
 
-  return {
+  const updatedFields: LessonPlanApplyField[] = [];
+  const preservedFields: AssignmentDesignerTouchedField[] = [];
+  const resolveField = <T extends AssignmentDesignerTouchedField>(
+    field: T,
+    nextValue: AssignmentDesignerForm[T] | null | undefined,
+    currentValue: AssignmentDesignerForm[T],
+  ): AssignmentDesignerForm[T] => {
+    if (touchedFields[field]) {
+      pushUnique(preservedFields, field);
+      return currentValue;
+    }
+    const resolved = pickOrKeep(nextValue, currentValue);
+    if (resolved !== currentValue && hasMeaningfulValue(nextValue)) {
+      pushUnique(updatedFields, field);
+    }
+    return resolved;
+  };
+
+  const nextMainSubjectId =
+    touchedFields.main_subject_id && current.main_subject_id <= 0
+      ? draft.main_subject_id
+      : resolveField("main_subject_id", draft.main_subject_id, current.main_subject_id);
+  if (touchedFields.main_subject_id && current.main_subject_id <= 0) {
+    if (nextMainSubjectId !== current.main_subject_id) {
+      pushUnique(updatedFields, "main_subject_id");
+    }
+  }
+  const nextRelatedSubjectIds = touchedFields.related_subject_ids
+    ? mergeRelatedSubjectIds(current.related_subject_ids, current.related_subject_ids, nextMainSubjectId)
+    : mergeRelatedSubjectIds(draft.related_subject_ids, current.related_subject_ids, nextMainSubjectId);
+  if (touchedFields.related_subject_ids) {
+    pushUnique(preservedFields, "related_subject_ids");
+  } else if (JSON.stringify(nextRelatedSubjectIds) !== JSON.stringify(current.related_subject_ids)) {
+    pushUnique(updatedFields, "related_subject_ids");
+  }
+
+  const nextBackground = resolveField("background_setting", processParts.background, current.background_setting);
+
+  const form = {
     ...current,
-    title: pickOrKeep(draft.title, current.title),
-    topic: pickOrKeep(draft.topic, current.topic),
-    description: pickOrKeep(draft.description, current.description),
-    background_setting: pickOrKeep(processParts.background, current.background_setting),
-    school_stage: pickOrKeep(draft.school_stage, current.school_stage),
-    grade: pickOrKeep(draft.grade, current.grade),
-    main_subject_id: pickOrKeep(draft.main_subject_id, current.main_subject_id),
-    related_subject_ids: mergeRelatedSubjectIds(
-      draft.related_subject_ids,
-      current.related_subject_ids,
-      pickOrKeep(draft.main_subject_id, current.main_subject_id),
-    ),
-    assignment_type: pickOrKeep(draft.assignment_type, current.assignment_type),
-    practical_subtype: pickOrKeep(draft.practical_subtype, current.practical_subtype),
-    inquiry_subtype: pickOrKeep(draft.inquiry_subtype, current.inquiry_subtype),
-    inquiry_depth: pickOrKeep(draft.inquiry_depth, current.inquiry_depth),
-    submission_mode: pickOrKeep(draft.submission_mode, current.submission_mode),
-    duration_weeks: pickOrKeep(draft.duration_weeks, current.duration_weeks),
+    title: resolveField("title", draft.title, current.title),
+    topic: resolveField("topic", draft.topic, current.topic),
+    description: resolveField("description", draft.description, current.description),
+    background_setting: nextBackground,
+    school_stage: resolveField("school_stage", draft.school_stage, current.school_stage),
+    grade: resolveField("grade", draft.grade, current.grade),
+    main_subject_id: nextMainSubjectId,
+    related_subject_ids: nextRelatedSubjectIds,
+    assignment_type: resolveField("assignment_type", draft.assignment_type, current.assignment_type),
+    practical_subtype: resolveField("practical_subtype", draft.practical_subtype || null, current.practical_subtype),
+    inquiry_subtype: resolveField("inquiry_subtype", draft.inquiry_subtype || null, current.inquiry_subtype),
+    inquiry_depth: resolveField("inquiry_depth", draft.inquiry_depth, current.inquiry_depth),
+    submission_mode: resolveField("submission_mode", draft.submission_mode, current.submission_mode),
+    duration_weeks: resolveField("duration_weeks", draft.duration_weeks, current.duration_weeks),
     deadline: current.deadline,
     objectives_json: {
-      knowledge: pickOrKeep(draft.objectives_json?.knowledge, current.objectives_json.knowledge),
-      process: pickOrKeep(processParts.process, current.objectives_json.process),
-      emotion: pickOrKeep(draft.objectives_json?.emotion, current.objectives_json.emotion),
+      knowledge: draft.objectives_json?.knowledge || "",
+      process: processParts.process,
+      emotion: draft.objectives_json?.emotion || "",
     },
-    steps: steps.length ? steps.map((step) => ({ ...step })) : current.steps,
-    rubric_dimensions: rubricDimensions.length ? [...rubricDimensions] : current.rubric_dimensions,
+    steps: steps.length ? steps.map((step) => ({ ...step })) : current.steps.map((step) => ({ ...step })),
+    rubric_dimensions: rubricDimensions.length ? [...rubricDimensions] : [...current.rubric_dimensions],
   };
+
+  return {
+    form,
+    summary: {
+      updatedFields,
+      preservedFields,
+      regeneratedSections: ["objectives", "steps", "rubric"],
+    },
+  };
+}
+
+export function formatLessonPlanApplySummary(summary: LessonPlanApplySummary): string {
+  const parts: string[] = [];
+
+  if (summary.updatedFields.length) {
+    parts.push(`已按教案更新：${summary.updatedFields.map((field) => LESSON_PLAN_FIELD_LABELS[field]).join("、")}`);
+  }
+  if (summary.preservedFields.length) {
+    parts.push(`已保留教师修改：${summary.preservedFields.map((field) => LESSON_PLAN_FIELD_LABELS[field]).join("、")}`);
+  }
+  if (summary.regeneratedSections.length) {
+    parts.push(`已重建：${summary.regeneratedSections.map((section) => LESSON_PLAN_SECTION_LABELS[section]).join("、")}`);
+  }
+
+  return parts.join("；");
 }
 
 export function buildDesignerCreatePayload(

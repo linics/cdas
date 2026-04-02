@@ -27,19 +27,24 @@ import {
 } from "../lib/api";
 import { type LessonStepDraft } from "../lib/mappers";
 import {
+  applyLessonPlanDraft,
   assignmentStatusLabel,
   type AssignmentDesignerForm,
   type AssignmentDesignerPreviewState,
+  type AssignmentDesignerTouchedField,
+  type AssignmentDesignerTouchedFields,
   buildDesignerCreatePayload,
   buildDesignerFormFromAssignment,
   buildDesignerInitialForm,
+  buildLessonPlanDraftRequest,
   buildDesignerPreviewState,
   defaultRubricNames,
   formatAIGenerationMeta,
+  formatLessonPlanApplySummary,
   gradeLabelByStage,
-  mergeDesignerFormWithLessonPlanDraft,
   mergeDesignerFormWithPreview,
   buildDesignerUpdatePayload,
+  isLessonPlanTouchedField,
   scoreStageLabel,
 } from "../view-models/assignment";
 import { validateAssignmentDesignerForm } from "../validation/assignment";
@@ -67,6 +72,7 @@ export function AssignmentDesigner() {
   const [referenceDocId, setReferenceDocId] = useState<number | null>(null);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
   const [preview, setPreview] = useState<AssignmentDesignerPreviewState | null>(null);
+  const [lessonPlanTouchedFields, setLessonPlanTouchedFields] = useState<AssignmentDesignerTouchedFields>({});
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -182,6 +188,7 @@ export function AssignmentDesigner() {
     setEditingAssignmentId(target.id);
     setReferenceDocId(target.document_id ?? null);
     setForm(buildDesignerFormFromAssignment(target));
+    setLessonPlanTouchedFields({});
     setTab("editor");
     setPreview(null);
     showNotice(`已载入：${target.title}`);
@@ -229,8 +236,19 @@ export function AssignmentDesigner() {
     [readyDocuments, referenceDocId],
   );
 
-  const updateForm = <K extends keyof AssignmentDesignerForm>(key: K, value: AssignmentDesignerForm[K]) => {
+  const markLessonPlanFieldTouched = (field: AssignmentDesignerTouchedField) => {
+    setLessonPlanTouchedFields((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+  };
+
+  const updateForm = <K extends keyof AssignmentDesignerForm>(
+    key: K,
+    value: AssignmentDesignerForm[K],
+    options?: { markTouched?: boolean },
+  ) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (options?.markTouched !== false && isLessonPlanTouchedField(key)) {
+      markLessonPlanFieldTouched(key);
+    }
   };
 
   const addStep = () => {
@@ -278,6 +296,7 @@ export function AssignmentDesigner() {
         ? prev.related_subject_ids.filter((id) => id !== subjectId)
         : [...prev.related_subject_ids, subjectId],
     }));
+    markLessonPlanFieldTouched("related_subject_ids");
   };
 
   const triggerReferenceUpload = () => {
@@ -367,28 +386,22 @@ export function AssignmentDesigner() {
     beginAIFeedback("lessonPlan");
     setError("");
     try {
-      const generated = await assignmentsApi.fromLessonPlan({
-        document_id: referenceDocId,
-        school_stage: form.school_stage,
-        grade: form.grade,
-        main_subject_id: form.main_subject_id || undefined,
-        related_subject_ids: form.related_subject_ids,
-        assignment_type: form.assignment_type,
-        inquiry_depth: form.inquiry_depth,
-        submission_mode: form.submission_mode,
-        duration_weeks: form.duration_weeks,
-      });
+      const generated = await assignmentsApi.fromLessonPlan(
+        buildLessonPlanDraftRequest(form, referenceDocId, lessonPlanTouchedFields),
+      );
+      const applied = applyLessonPlanDraft(form, generated, lessonPlanTouchedFields);
 
-      setForm((prev) => mergeDesignerFormWithLessonPlanDraft(prev, generated));
+      setForm(applied.form);
       setReferenceDocId(generated.document_id);
       setPreview(null);
+      const summaryText = formatLessonPlanApplySummary(applied.summary);
       if (generated.meta?.source === "fallback") {
         const reason = generated.meta.fallback_reason && generated.meta.fallback_reason !== "none"
           ? `（原因：${generated.meta.fallback_reason}）`
           : "";
-        showNotice(`教案草稿已生成，但当前为兜底结果，建议重试以获取 AI 版本${reason}`, "warning");
+        showNotice(`${summaryText}；当前为兜底结果，建议重试以获取 AI 版本${reason}`, "warning");
       } else {
-        showNotice("已根据教案生成作业草稿，请检查后保存或发布");
+        showNotice(summaryText);
       }
     } catch (err) {
       const raw = getApiErrorMessage(err, "教案生成草稿失败");
@@ -473,6 +486,7 @@ export function AssignmentDesigner() {
     setReferenceDocId(null);
     setPreview(null);
     setForm(buildDesignerInitialForm());
+    setLessonPlanTouchedFields({});
     showNotice("已新建空白设计");
     navigate("/create", { replace: true });
   };
@@ -866,7 +880,7 @@ export function AssignmentDesigner() {
                 <input
                   ref={referenceFileInputRef}
                   type="file"
-                  accept=".pdf,.doc,.docx"
+                  accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={handleReferenceUpload}
                 />

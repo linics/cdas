@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import {
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
   classesApi,
   evaluationsApi,
   getApiErrorMessage,
+  normalizeAttachmentUrl,
   submissionsApi,
   type Assignment,
   type AssignmentGroup,
@@ -23,10 +24,12 @@ import {
   type ClassroomMember,
   type Evaluation,
   type Submission,
+  type SubmissionAttachment,
 } from "../lib/api";
 import { stageToSchoolLevel } from "../lib/mappers";
 import { splitBackgroundFromProcess } from "../view-models/assignment";
 import {
+  buildSubmissionEditorState,
   buildGroupProgressRows,
   collectPhaseEvidenceHints,
   countCoveredEvidence,
@@ -35,6 +38,10 @@ import {
   formatDateTime,
   gradeLabel,
   groupMemberText,
+  mergeSubmissionAttachment,
+  patchSubmissionAttachments,
+  preserveSubmissionEditorContent,
+  removeSubmissionAttachment,
   scoreLabel,
   statusLabel,
   submissionModeLabel,
@@ -42,6 +49,7 @@ import {
 import { PageState } from "../components/PageState";
 import { StatusBanner } from "../components/StatusBanner";
 import { validateGroupName } from "../validation/classroom";
+import { validateSubmissionAttachmentFile } from "../validation/knowledge";
 import { validateAttachmentDraft, validateSubmissionForSubmit } from "../validation/submission";
 
 export function AssignmentDetail() {
@@ -49,6 +57,8 @@ export function AssignmentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const attachmentFileInputRef = useRef<HTMLInputElement | null>(null);
+  const selectionHydratedSubmissionIdRef = useRef<number | null>(null);
 
   const assignmentId = Number(id || 0);
 
@@ -63,7 +73,7 @@ export function AssignmentDetail() {
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
 
   const [contentText, setContentText] = useState("");
-  const [attachments, setAttachments] = useState<Array<{ filename: string; url: string; type: string }>>([]);
+  const [attachments, setAttachments] = useState<SubmissionAttachment[]>([]);
   const [attachmentName, setAttachmentName] = useState("");
   const [attachmentUrl, setAttachmentUrl] = useState("");
 
@@ -78,6 +88,7 @@ export function AssignmentDetail() {
 
   const [loading, setLoading] = useState(true);
   const [loadingClassMembers, setLoadingClassMembers] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -85,6 +96,21 @@ export function AssignmentDetail() {
   const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const hydrateEditorState = useCallback((submission: Submission | null) => {
+    const nextState = buildSubmissionEditorState(submission);
+    setContentText(nextState.contentText);
+    setAttachments(nextState.attachments);
+  }, []);
+
+  const preserveEditorContentWhileUpdatingAttachments = useCallback(
+    (nextAttachments: SubmissionAttachment[]) => {
+      const nextState = preserveSubmissionEditorContent(contentText, nextAttachments);
+      setContentText(nextState.contentText);
+      setAttachments(nextState.attachments);
+    },
+    [contentText],
+  );
 
   const loadData = useCallback(async () => {
     if (!assignmentId) return;
@@ -116,9 +142,12 @@ export function AssignmentDetail() {
           });
           const requested = list.find((item) => item.id === requestedId);
           const fallback = sorted[sorted.length - 1];
-          setActiveSubmissionId((requested || fallback).id);
+          const nextActiveSubmission = requested || fallback;
+          setActiveSubmissionId(nextActiveSubmission.id);
+          hydrateEditorState(nextActiveSubmission);
         } else {
           setActiveSubmissionId(null);
+          hydrateEditorState(null);
         }
       } else if (user?.role === "teacher") {
         const [teacherSubmissions, classResp] = await Promise.all([
@@ -137,8 +166,10 @@ export function AssignmentDetail() {
 
         if (list.length > 0) {
           setActiveSubmissionId(list[0].id);
+          hydrateEditorState(list[0]);
         } else {
           setActiveSubmissionId(null);
+          hydrateEditorState(null);
         }
       }
     } catch (err) {
@@ -146,7 +177,7 @@ export function AssignmentDetail() {
     } finally {
       setLoading(false);
     }
-  }, [assignmentId, user?.role, location.search]);
+  }, [assignmentId, hydrateEditorState, user?.role, location.search]);
 
   useEffect(() => {
     loadData();
@@ -198,26 +229,20 @@ export function AssignmentDetail() {
   }, [assignmentGroups, user]);
 
   useEffect(() => {
-    if (!activeSubmission) {
-      setContentText("");
-      setAttachments([]);
+    if (activeSubmissionId == null) {
+      selectionHydratedSubmissionIdRef.current = null;
+      hydrateEditorState(null);
       return;
     }
-
-    const text =
-      typeof activeSubmission.content_json?.text === "string"
-        ? (activeSubmission.content_json.text as string)
-        : JSON.stringify(activeSubmission.content_json || {}, null, 2);
-
-    setContentText(text === "{}" ? "" : text);
-    setAttachments(
-      (activeSubmission.attachments_json || []).map((item) => ({
-        filename: item.filename,
-        url: item.url,
-        type: item.type,
-      })),
-    );
-  }, [activeSubmission]);
+    if (!activeSubmission || activeSubmission.id !== activeSubmissionId) {
+      return;
+    }
+    if (selectionHydratedSubmissionIdRef.current === activeSubmissionId) {
+      return;
+    }
+    selectionHydratedSubmissionIdRef.current = activeSubmissionId;
+    hydrateEditorState(activeSubmission);
+  }, [activeSubmission, activeSubmissionId, hydrateEditorState]);
 
   const loadEvaluations = useCallback(async () => {
     if (!activeSubmissionId) {
@@ -422,13 +447,88 @@ export function AssignmentDetail() {
     const name = attachmentName.trim();
     const url = attachmentUrl.trim();
 
-    setAttachments((prev) => [...prev, { filename: name, url, type: "link" }]);
+    preserveEditorContentWhileUpdatingAttachments([
+      ...attachments,
+      { filename: name, url, type: "link", source: "link", parsing_status: "ready" },
+    ]);
     setAttachmentName("");
     setAttachmentUrl("");
   };
 
-  const removeAttachment = (index: number) => {
-    setAttachments((prev) => prev.filter((_, idx) => idx !== index));
+  const removeAttachment = async (attachment: SubmissionAttachment, index: number) => {
+    if (attachment.source === "upload" && activeSubmission?.id && attachment.attachment_id) {
+      try {
+        await submissionsApi.deleteAttachment(activeSubmission.id, attachment.attachment_id);
+        const nextAttachments = removeSubmissionAttachment(attachments, {
+          attachment_id: attachment.attachment_id,
+          filename: attachment.filename,
+          url: attachment.url,
+          source: attachment.source,
+        });
+        preserveEditorContentWhileUpdatingAttachments(nextAttachments);
+        setSubmissions((prev) => patchSubmissionAttachments(prev, activeSubmission.id, nextAttachments));
+        setNotice(`已删除附件：${attachment.filename}`);
+      } catch (err) {
+        setError(getApiErrorMessage(err, "删除附件失败"));
+      }
+      return;
+    }
+    preserveEditorContentWhileUpdatingAttachments(attachments.filter((_, idx) => idx !== index));
+  };
+
+  const buildLinkAttachmentsPayload = () =>
+    attachments
+      .filter((item) => item.source !== "upload")
+      .map((item) => ({
+        filename: item.filename,
+        url: item.url,
+        type: item.type,
+        size_bytes: item.size_bytes,
+      }));
+
+  const triggerAttachmentUpload = () => {
+    attachmentFileInputRef.current?.click();
+  };
+
+  const openAttachment = async (attachment: SubmissionAttachment) => {
+    if (attachment.source === "upload") {
+      try {
+        await submissionsApi.downloadAttachment(attachment);
+      } catch (err) {
+        setError(getApiErrorMessage(err, "下载附件失败"));
+      }
+      return;
+    }
+    window.open(normalizeAttachmentUrl(attachment.url), "_blank", "noopener,noreferrer");
+  };
+
+  const handleAttachmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !activeSubmission) return;
+    const fileError = validateSubmissionAttachmentFile(file);
+    if (fileError) {
+      setError(fileError);
+      return;
+    }
+
+    setUploadingAttachment(true);
+    setError("");
+    try {
+      const uploaded = await submissionsApi.uploadAttachment(activeSubmission.id, file);
+      const nextAttachments = mergeSubmissionAttachment(attachments, uploaded);
+      preserveEditorContentWhileUpdatingAttachments(nextAttachments);
+      setSubmissions((prev) => patchSubmissionAttachments(prev, activeSubmission.id, nextAttachments));
+      if (uploaded.parsing_status === "ready") {
+        setNotice(`附件已上传并完成解析：${uploaded.filename}`);
+      } else {
+        setError(uploaded.error_msg || `附件已上传，但解析失败：${uploaded.filename}`);
+      }
+    } catch (err) {
+      setError(getApiErrorMessage(err, "上传附件失败"));
+    } finally {
+      setUploadingAttachment(false);
+    }
   };
 
   const saveDraft = async () => {
@@ -439,7 +539,7 @@ export function AssignmentDetail() {
     try {
       await submissionsApi.update(activeSubmission.id, {
         content_json: { text: contentText },
-        attachments_json: attachments,
+        attachments_json: buildLinkAttachmentsPayload(),
       });
       setNotice("草稿已保存");
       await loadData();
@@ -467,7 +567,7 @@ export function AssignmentDetail() {
     try {
       await submissionsApi.update(activeSubmission.id, {
         content_json: { text: contentText },
-        attachments_json: attachments,
+        attachments_json: buildLinkAttachmentsPayload(),
       });
 
       const result = await submissionsApi.submit(activeSubmission.id);
@@ -1201,7 +1301,30 @@ export function AssignmentDetail() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-semibold text-text">附件链接</label>
+              <div className="flex items-center justify-between gap-3">
+                <label className="text-sm font-semibold text-text">附件链接与上传</label>
+                {!readOnly && (
+                  <>
+                    <input
+                      ref={attachmentFileInputRef}
+                      type="file"
+                      accept=".pdf,.docx,.txt,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={handleAttachmentUpload}
+                    />
+                    <button
+                      type="button"
+                      onClick={triggerAttachmentUpload}
+                      disabled={uploadingAttachment}
+                      className="px-3 py-2 rounded-lg border border-border-strong text-sm font-semibold hover:bg-surface-muted disabled:opacity-60 flex items-center gap-2"
+                    >
+                      {uploadingAttachment ? <LoaderCircle className="w-4 h-4 animate-spin" /> : <FileUp className="w-4 h-4" />}
+                      上传文件
+                    </button>
+                  </>
+                )}
+              </div>
+              <p className="text-xs text-text-secondary">支持 PDF、DOCX、TXT。文件附件会先解析，再参与正式提交与后续分析。</p>
               <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr,auto] gap-2">
                 <input
                   value={attachmentName}
@@ -1228,13 +1351,37 @@ export function AssignmentDetail() {
               <div className="space-y-2">
                 {attachments.length === 0 && <p className="text-xs text-text-secondary">暂无附件链接</p>}
                 {attachments.map((item, index) => (
-                  <div key={`${item.filename}_${index}`} className="flex items-center justify-between gap-3 bg-surface-muted border border-border rounded-lg px-3 py-2">
-                    <a href={item.url} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline truncate">
-                      {item.filename}
-                    </a>
+                  <div key={`${item.filename}_${index}`} className="flex items-start justify-between gap-3 bg-surface-muted border border-border rounded-lg px-3 py-2">
+                    <div className="min-w-0 space-y-1">
+                      {item.source === "upload" ? (
+                        <button
+                          type="button"
+                          onClick={() => void openAttachment(item)}
+                          className="text-sm text-primary hover:underline truncate block text-left"
+                        >
+                          {item.filename}
+                        </button>
+                      ) : (
+                        <a
+                          href={normalizeAttachmentUrl(item.url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-primary hover:underline truncate block"
+                        >
+                          {item.filename}
+                        </a>
+                      )}
+                      <div className="flex flex-wrap gap-2 text-[11px] text-text-secondary">
+                        <span>{item.source === "upload" ? "上传文件" : "附件链接"}</span>
+                        {item.parsing_status && <span>状态：{item.parsing_status}</span>}
+                        {typeof item.size_bytes === "number" && <span>{Math.max(1, Math.round(item.size_bytes / 1024))} KB</span>}
+                      </div>
+                      {item.summary_text && <p className="text-xs text-text-secondary break-words">摘要：{item.summary_text}</p>}
+                      {item.error_msg && <p className="text-xs text-danger break-words">解析失败：{item.error_msg}</p>}
+                    </div>
                     {!readOnly && (
                       <button
-                        onClick={() => removeAttachment(index)}
+                        onClick={() => void removeAttachment(item, index)}
                         className="text-danger hover:text-danger"
                         title="删除附件"
                       >

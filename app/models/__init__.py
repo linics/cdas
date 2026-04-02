@@ -21,7 +21,12 @@ from app.models.enums import (
 from app.models.user import User, UserRole
 from app.models.subject import Subject, PRESET_SUBJECTS
 from app.models.assignment import Assignment, ProjectGroup
-from app.models.submission import Submission, Evaluation
+from app.models.submission import (
+    Evaluation,
+    Submission,
+    SubmissionAttachmentAnalysis,
+    SubmissionAttachmentAsset,
+)
 from app.models.classroom import Classroom, ClassMember, ClassGroup, ClassGroupMember
 
 __all__ = [
@@ -55,4 +60,6 @@ __all__ = [
     # 提交与评价模块
     "Submission",
     "Evaluation",
+    "SubmissionAttachmentAsset",
+    "SubmissionAttachmentAnalysis",
 ]

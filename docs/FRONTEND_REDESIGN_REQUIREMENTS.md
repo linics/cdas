@@ -905,7 +905,7 @@ flowchart TD
 
 限制：
 
-- 仅支持 `.pdf/.doc/.docx`
+- 仅支持 `.pdf/.docx/.txt`
 - 文件不能为空
 - 不得超过 10MB
 

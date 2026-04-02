@@ -2,6 +2,9 @@ export interface SubmissionAttachmentInput {
   filename: string;
   url: string;
   type?: string;
+  source?: "link" | "upload";
+  parsing_status?: "uploaded" | "indexing" | "ready" | "failed";
+  error_msg?: string | null;
 }
 
 export interface SubmissionValidationInput {
@@ -36,8 +39,21 @@ export function validateAttachmentDraft(
 }
 
 export function validateSubmissionForSubmit(input: SubmissionValidationInput): string | null {
-  if (input.attachments.some((item) => !item.filename.trim() || !item.url.trim() || !isHttpUrl(item.url.trim()))) {
+  if (
+    input.attachments.some(
+      (item) =>
+        (item.source !== "upload" && (!item.filename.trim() || !item.url.trim() || !isHttpUrl(item.url.trim()))),
+    )
+  ) {
     return "存在无效附件，请先修正附件名称或链接";
+  }
+  const pendingUpload = input.attachments.find(
+    (item) => item.source === "upload" && item.parsing_status && item.parsing_status !== "ready",
+  );
+  if (pendingUpload) {
+    return pendingUpload.error_msg?.trim()
+      ? `附件《${pendingUpload.filename}》尚未就绪：${pendingUpload.error_msg?.trim()}`
+      : `附件《${pendingUpload.filename}》尚未就绪，请等待解析完成后再提交`;
   }
   const hasText = input.contentText.trim().length > 0;
   const hasAttachment = input.attachments.length > 0;

@@ -165,6 +165,52 @@ def main():
         "subject_total": subjects_data.get("total"),
     }
 
+    resp = requests.get(f"{BASE}/api/documents", timeout=15)
+    expect(resp, 200, "list documents before")
+    docs_before = resp.json()
+
+    lesson_plan_filename = f"lesson-plan-{suffix}.txt"
+    lesson_plan_content = (
+        "教案名称：校园节水行动\n"
+        "学段：初中\n"
+        "年级：7年级\n"
+        "主学科：科学\n"
+        "融合学科：数学\n"
+        "作业类型：项目式\n"
+        "提交模式：一次性提交\n"
+        "周期：3周\n"
+        "教学过程：先调查校园用水数据，再完成分析与改进方案。\n"
+    ).encode("utf-8")
+
+    resp = requests.post(
+        f"{BASE}/api/documents/upload",
+        files={"file": (lesson_plan_filename, lesson_plan_content, "text/plain")},
+        timeout=60,
+    )
+    expect(resp, 200, "upload lesson plan document")
+    lesson_plan_upload = resp.json()
+    lesson_plan_doc_id = lesson_plan_upload.get("document_id") or lesson_plan_upload.get("id")
+    if not lesson_plan_doc_id:
+        raise RuntimeError(f"lesson plan document id missing: {lesson_plan_upload}")
+
+    resp = requests.post(
+        f"{BASE}/api/v2/assignments/from-lesson-plan",
+        headers=teacher_headers,
+        json={"document_id": lesson_plan_doc_id},
+        timeout=90,
+    )
+    expect(resp, 200, "from lesson plan")
+    lesson_plan_generated = resp.json()
+    if not lesson_plan_generated.get("title"):
+        raise RuntimeError("lesson plan generation missing title")
+    summary["lesson_plan_generation"] = {
+        "document_id": lesson_plan_doc_id,
+        "title": lesson_plan_generated.get("title"),
+        "school_stage": lesson_plan_generated.get("school_stage"),
+        "grade": lesson_plan_generated.get("grade"),
+        "assignment_type": lesson_plan_generated.get("assignment_type"),
+    }
+
     rubric_names = [
         "Problem Framing",
         "Evidence Quality",
@@ -347,6 +393,27 @@ def main():
         "attachment_count": len(updated_submission.get("attachments_json") or []),
     }
 
+    attachment_filename = f"submission-note-{suffix}.txt"
+    attachment_content = (
+        "附件证据：记录了校园洗手池用水高峰时段，并附上了改进建议。\n"
+        "关键发现：午间高峰有明显浪费。\n"
+    ).encode("utf-8")
+    resp = requests.post(
+        f"{BASE}/api/v2/submissions/{submission_id}/attachments/upload",
+        headers=student_headers,
+        files={"file": (attachment_filename, attachment_content, "text/plain")},
+        timeout=60,
+    )
+    expect(resp, 200, "upload submission attachment")
+    attachment_data = resp.json()
+    if attachment_data.get("parsing_status") != "ready":
+        raise RuntimeError(f"submission attachment not ready: {attachment_data}")
+    summary["submission_attachment_upload"] = {
+        "attachment_id": attachment_data.get("attachment_id"),
+        "filename": attachment_data.get("filename"),
+        "parsing_status": attachment_data.get("parsing_status"),
+    }
+
     resp = requests.post(
         f"{BASE}/api/v2/submissions/{submission_id}/submit",
         headers=student_headers,
@@ -440,30 +507,8 @@ def main():
         "matched_submission_feedback": len(received_match),
     }
 
-    resp = requests.get(f"{BASE}/api/documents", timeout=15)
-    expect(resp, 200, "list documents before")
-    docs_before = resp.json()
-
-    filename = f"integration-{suffix}.txt"
-    content = (
-        "CDAS integration test document\n"
-        "This file is uploaded for API workflow validation.\n"
-        f"run_id={suffix}\n"
-    ).encode("utf-8")
-
-    resp = requests.post(
-        f"{BASE}/api/documents/upload",
-        files={"file": (filename, content, "text/plain")},
-        timeout=60,
-    )
-    expect(resp, 200, "upload document")
-    upload_data = resp.json()
-    doc_id = upload_data.get("document_id") or upload_data.get("id")
-    if not doc_id:
-        raise RuntimeError(f"document id missing: {upload_data}")
-
     for _ in range(5):
-        resp = requests.get(f"{BASE}/api/documents/{doc_id}", timeout=15)
+        resp = requests.get(f"{BASE}/api/documents/{lesson_plan_doc_id}", timeout=15)
         if resp.status_code == 200:
             break
         time.sleep(1)
@@ -478,10 +523,10 @@ def main():
     resp = requests.get(f"{BASE}/api/documents", timeout=15)
     expect(resp, 200, "list documents after upload")
     docs_after_upload = resp.json()
-    if not any(d.get("id") == doc_id for d in docs_after_upload):
+    if not any(d.get("id") == lesson_plan_doc_id for d in docs_after_upload):
         raise RuntimeError("uploaded document not found in list")
 
-    resp = requests.delete(f"{BASE}/api/documents/{doc_id}", timeout=15)
+    resp = requests.delete(f"{BASE}/api/documents/{lesson_plan_doc_id}", timeout=15)
     expect(resp, 200, "delete document")
 
     resp = requests.get(f"{BASE}/api/documents", timeout=15)
@@ -492,8 +537,8 @@ def main():
 
     summary["knowledge_base"] = {
         "docs_before": len(docs_before),
-        "uploaded_document_id": doc_id,
-        "upload_status": upload_data.get("status") or upload_data.get("parsing_status"),
+        "uploaded_document_id": lesson_plan_doc_id,
+        "upload_status": lesson_plan_upload.get("status") or lesson_plan_upload.get("parsing_status"),
         "detail_status": detail_status,
         "docs_after_upload": len(docs_after_upload),
         "docs_after_delete": len(docs_after_delete),

@@ -31,9 +31,12 @@ class AssignmentPreviewPromptContext:
 class LessonPlanPromptContext:
     title: str
     topic: str
+    description: str
     school_stage: str
     grade: int
     assignment_type: str
+    subtype: str
+    background_setting: str
     inquiry_depth: str
     submission_mode: str
     duration_weeks: int
@@ -83,9 +86,12 @@ def build_lesson_plan_prompt(ctx: LessonPlanPromptContext) -> tuple[str, str]:
     user_prompt = load_template("lesson_plan.user.txt").format(
         title=ctx.title,
         topic=ctx.topic,
+        description=ctx.description or "none",
         school_stage=ctx.school_stage,
         grade=ctx.grade,
         assignment_type=ctx.assignment_type,
+        subtype=ctx.subtype,
+        background_setting=ctx.background_setting or "none",
         inquiry_depth=ctx.inquiry_depth,
         submission_mode=ctx.submission_mode,
         duration_weeks=ctx.duration_weeks,

@@ -33,6 +33,9 @@
 | `phase_index` | 必须在 assignment 阶段范围内 | MUST |
 | `step_index` | 若提供，必须在阶段步骤范围内 | MUST |
 | `attachments_json[].url` | 仅允许 `http/https` | MUST |
+| 文件附件 | 通过独立附件域上传，首版仅支持 `PDF/DOCX/TXT` | MUST |
+| 文件附件状态 | 存在文件附件时，正式提交前必须全部为 `READY` | MUST |
+| 截止后附件清理 | 若晚提交仍允许，学生可删除阻塞正式提交的未就绪文件附件；已 `READY` 的文件附件仍按截止时间限制 | MUST |
 | `checkpoints_json` | key 必须存在于 assignment 定义中 | MUST |
 | 正式提交 | 至少一项证据：文本 / 附件 / checkpoint | MUST |
 | 小组提交 | 必须校验作业归属和成员身份 | MUST |
@@ -91,7 +94,7 @@
 前端必须至少在以下页面提前阻断输入：
 
 - `AssignmentDesigner`：标题、主题、学段年级、步骤、量规、主副学科
-- `AssignmentDetail`：附件链接、正式提交证据、小组名
+- `AssignmentDetail`：附件链接、文件附件状态、正式提交证据、小组名
 - `GradingPanel`：反馈必填、维度分数与 rubric 对齐
 - `Auth`：用户名/密码/学生年级
 - `TeacherClassManager` / `StudentDashboard`：班级名、小组名、邀请码
@@ -128,5 +131,8 @@
 
 - 新增字段只做非破坏性扩展
 - 旧字段不改名、不改类型
+- `POST /api/v2/assignments/from-lesson-plan` 请求允许新增可选顶层约束字段，用于传递教师已手动修改的字段
+- 对 `POST /api/v2/assignments/from-lesson-plan`，未发送字段表示允许重新推断；显式空字符串表示教师清空文本约束；`main_subject_id: null` 表示取消教师覆盖并重新推断主学科
+- `SubmissionResponse.attachments_json` 允许新增可选字段，但不得删除原有 `filename/url/type/size_bytes`
 - 旧数据读取时允许缺省，但重写时必须归一化
 - 生产基线 Python 为 `3.12`

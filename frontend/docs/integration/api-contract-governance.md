@@ -19,6 +19,7 @@
 - 日期时间使用 ISO 8601 字符串
 - 现有 enum 值不得原位改名
 - 现有成功响应字段不得直接删除或改类型
+- 对既有成功字段只允许新增可选子字段，例如 `attachments_json[]` 的扩展元数据
 
 ## Write-Side Constraint Policy
 
@@ -44,10 +45,13 @@
 - 对旧数据提供 defensive defaults
 - 对新增 `400/422` 提示展示 `detail`
 - 在保存前将旧结构归一化为当前写入合同
+- 对 `from-lesson-plan` 请求采用“仅发送教师已手动修改的顶层约束”语义；未发送字段视为允许后端按教案重新推断；已发送字段可包含标题、主题、说明、背景、作业类型及子类型等
 - 对历史默认占位 rubric 保持评分兼容；对显式 rubric 按严格维度对齐处理
 - 对 AI 响应中的新增可选 `meta` 字段采用 defensive defaults，不将其视为必填
 - 对 `preview`、`from-lesson-plan`、`ai-assist` 的 `meta.source/prompt_id/prompt_version/used_rag/fallback_reason` 做向后兼容消费
 - 对 `from-lesson-plan` 等链路中的 `meta.input_truncated` 与 lesson plan warning 做语义兼容消费：它们表示模型输入在进入推理前发生过压缩或截断，而不是仅表示最后一次字符串截断函数命中
+- 对 `SubmissionResponse.attachments_json[]` 中新增的 `attachment_id/source/parsing_status/mime_type/error_msg/summary_text` 采用可选字段消费，不把它们当作写入必填项
+- 前端文档与附件上传入口统一按 `PDF / DOCX / TXT` 约束做前置校验，不再提示或接受 `.doc`
 
 ## Required Checks
 

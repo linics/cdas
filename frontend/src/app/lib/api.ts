@@ -8,7 +8,6 @@ export type EvaluationType = "teacher" | "self" | "peer";
 export type EvaluationLevel = "excellent" | "good" | "pass" | "improve";
 
 const TOKEN_KEY = "cdas_token";
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").trim();
 
 export class ApiError extends Error {
   status: number;
@@ -40,9 +39,15 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+function getApiBaseUrl(): string {
+  return (import.meta.env.VITE_API_BASE_URL || "").trim();
+}
+
 function buildUrl(path: string): string {
-  if (!API_BASE_URL) return path;
-  return `${API_BASE_URL}${path}`;
+  if (/^https?:\/\//i.test(path)) return path;
+  const apiBaseUrl = getApiBaseUrl();
+  if (!apiBaseUrl) return path;
+  return `${apiBaseUrl}${path}`;
 }
 
 function withQuery(path: string, params: Record<string, unknown>): string {
@@ -128,6 +133,78 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   return payload as T;
+}
+
+function parseDownloadFilename(contentDisposition: string | null, fallbackFilename: string): string {
+  if (!contentDisposition) {
+    return fallbackFilename;
+  }
+  const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      return utf8Match[1];
+    }
+  }
+  const quotedMatch = contentDisposition.match(/filename="([^"]+)"/i);
+  if (quotedMatch?.[1]) {
+    return quotedMatch[1];
+  }
+  const plainMatch = contentDisposition.match(/filename=([^;]+)/i);
+  if (plainMatch?.[1]) {
+    return plainMatch[1].trim();
+  }
+  return fallbackFilename;
+}
+
+export function normalizeAttachmentUrl(url: string): string {
+  return buildUrl(url);
+}
+
+export async function downloadAuthenticatedFile(url: string, fallbackFilename: string): Promise<void> {
+  const requestHeaders = new Headers();
+  const token = getToken();
+  if (token) {
+    requestHeaders.set("Authorization", `Bearer ${token}`);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(normalizeAttachmentUrl(url), {
+      method: "GET",
+      headers: requestHeaders,
+    });
+  } catch {
+    throw new ApiError(0, "网络异常，请检查后端服务是否启动");
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearToken();
+      window.dispatchEvent(new Event("cdas-auth-invalid"));
+    }
+    const contentType = response.headers.get("content-type") || "";
+    let detail: unknown = "";
+    if (contentType.includes("application/json")) {
+      const payload = await response.json().catch(() => null);
+      detail = payload && typeof payload === "object" && "detail" in payload ? payload.detail : payload;
+    } else {
+      detail = await response.text().catch(() => "");
+    }
+    const message = typeof detail === "string" && detail ? detail : `请求失败（${response.status}）`;
+    throw new ApiError(response.status, message, detail);
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = parseDownloadFilename(response.headers.get("content-disposition"), fallbackFilename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 export interface ApiUser {
@@ -350,11 +427,17 @@ export interface AssignmentPreviewResponse {
 
 export interface AssignmentLessonPlanDraftRequest {
   document_id: number;
+  title?: string;
+  topic?: string;
+  description?: string;
+  background_setting?: string;
   school_stage?: SchoolStage;
   grade?: number;
-  main_subject_id?: number;
+  main_subject_id?: number | null;
   related_subject_ids?: number[];
   assignment_type?: AssignmentType;
+  practical_subtype?: "visit" | "simulation" | "observation";
+  inquiry_subtype?: "literature" | "survey" | "experiment";
   inquiry_depth?: InquiryDepth;
   submission_mode?: SubmissionMode;
   duration_weeks?: number;
@@ -407,7 +490,7 @@ export interface Submission {
   step_index?: number | null;
   status: SubmissionStatus;
   content_json: Record<string, unknown>;
-  attachments_json: Array<{ filename: string; url: string; type: string; size_bytes?: number }>;
+  attachments_json: SubmissionAttachment[];
   checkpoints_json: Record<string, boolean>;
   created_at: string;
   submitted_at?: string | null;
@@ -429,18 +512,43 @@ export interface SubmissionCreatePayload {
   step_index?: number;
   group_id?: number;
   content_json?: Record<string, unknown>;
-  attachments_json?: Array<{ filename: string; url: string; type: string; size_bytes?: number }>;
+  attachments_json?: SubmissionLinkAttachmentInput[];
   checkpoints_json?: Record<string, boolean>;
 }
 
 export interface SubmissionUpdatePayload {
   content_json?: Record<string, unknown>;
-  attachments_json?: Array<{ filename: string; url: string; type: string; size_bytes?: number }>;
+  attachments_json?: SubmissionLinkAttachmentInput[];
   checkpoints_json?: Record<string, boolean>;
 }
 
 export interface SubmissionListResponse {
   submissions: Submission[];
+  total: number;
+}
+
+export interface SubmissionAttachment {
+  filename: string;
+  url: string;
+  type: string;
+  size_bytes?: number;
+  attachment_id?: number;
+  source?: "link" | "upload";
+  parsing_status?: "uploaded" | "indexing" | "ready" | "failed";
+  mime_type?: string | null;
+  error_msg?: string | null;
+  summary_text?: string | null;
+}
+
+export interface SubmissionLinkAttachmentInput {
+  filename: string;
+  url: string;
+  type: string;
+  size_bytes?: number;
+}
+
+export interface SubmissionAttachmentListResponse {
+  attachments: SubmissionAttachment[];
   total: number;
 }
 
@@ -732,6 +840,26 @@ export const submissionsApi = {
       method: "PUT",
       body: payload,
     }),
+
+  uploadAttachment: (submissionId: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return request<SubmissionAttachment>(`/api/v2/submissions/${submissionId}/attachments/upload`, {
+      method: "POST",
+      body: formData,
+    });
+  },
+
+  listAttachments: (submissionId: number) =>
+    request<SubmissionAttachmentListResponse>(`/api/v2/submissions/${submissionId}/attachments`),
+
+  deleteAttachment: (submissionId: number, attachmentId: number) =>
+    request<void>(`/api/v2/submissions/${submissionId}/attachments/${attachmentId}`, {
+      method: "DELETE",
+    }),
+
+  downloadAttachment: (attachment: SubmissionAttachment) =>
+    downloadAuthenticatedFile(attachment.url, attachment.filename),
 
   submit: (id: number) =>
     request<Submission>(`/api/v2/submissions/${id}/submit`, {

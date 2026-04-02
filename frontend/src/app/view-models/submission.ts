@@ -1,4 +1,9 @@
-import type { AssignmentGroup, AssignmentPhase, Submission } from "../lib/api";
+import type {
+  AssignmentGroup,
+  AssignmentPhase,
+  Submission,
+  SubmissionAttachment,
+} from "../lib/api";
 
 export interface EvidenceHint {
   content: string;
@@ -41,6 +46,11 @@ export interface SubmissionGroupScoreSummary {
   draft: number;
   gradedRate: number;
   pendingRate: number;
+}
+
+export interface SubmissionEditorState {
+  contentText: string;
+  attachments: SubmissionAttachment[];
 }
 
 export function statusLabel(status: string): string {
@@ -337,4 +347,78 @@ export function countCoveredEvidence(
     const normalizedHint = normalizeForMatch(hint.content);
     return normalizedHint.length >= 2 && combined.includes(normalizedHint);
   }).length;
+}
+
+export function buildSubmissionEditorState(submission: Submission | null): SubmissionEditorState {
+  if (!submission) {
+    return { contentText: "", attachments: [] };
+  }
+
+  const text =
+    typeof submission.content_json?.text === "string"
+      ? (submission.content_json.text as string)
+      : JSON.stringify(submission.content_json || {}, null, 2);
+
+  return {
+    contentText: text === "{}" ? "" : text,
+    attachments: (submission.attachments_json || []).map((item) => ({ ...item })),
+  };
+}
+
+export function preserveSubmissionEditorContent(
+  contentText: string,
+  attachments: SubmissionAttachment[],
+): SubmissionEditorState {
+  return {
+    contentText,
+    attachments: attachments.map((item) => ({ ...item })),
+  };
+}
+
+export function mergeSubmissionAttachment(
+  attachments: SubmissionAttachment[],
+  nextAttachment: SubmissionAttachment,
+): SubmissionAttachment[] {
+  if (nextAttachment.attachment_id) {
+    const existingIndex = attachments.findIndex(
+      (item) => item.attachment_id === nextAttachment.attachment_id,
+    );
+    if (existingIndex >= 0) {
+      return attachments.map((item, index) =>
+        index === existingIndex ? { ...item, ...nextAttachment } : item,
+      );
+    }
+  }
+  return [...attachments, { ...nextAttachment }];
+}
+
+export function removeSubmissionAttachment(
+  attachments: SubmissionAttachment[],
+  target: Pick<SubmissionAttachment, "attachment_id" | "filename" | "url" | "source">,
+): SubmissionAttachment[] {
+  return attachments.filter((item) => {
+    if (target.attachment_id) {
+      return item.attachment_id !== target.attachment_id;
+    }
+    return !(
+      item.source === target.source &&
+      item.filename === target.filename &&
+      item.url === target.url
+    );
+  });
+}
+
+export function patchSubmissionAttachments(
+  submissions: Submission[],
+  submissionId: number,
+  attachments: SubmissionAttachment[],
+): Submission[] {
+  return submissions.map((submission) =>
+    submission.id === submissionId
+      ? {
+          ...submission,
+          attachments_json: attachments.map((item) => ({ ...item })),
+        }
+      : submission,
+  );
 }

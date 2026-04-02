@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.config import get_settings
 from app.contracts.evaluation import (
@@ -25,6 +25,7 @@ from app.models import (
     Evaluation,
     ProjectGroup,
     Submission,
+    SubmissionAttachmentAsset,
     User,
     EvaluationType,
     EvaluationLevel,
@@ -409,6 +410,44 @@ def _serialize_rubric_json_for_prompt(
     return last_serialized
 
 
+def _build_attachment_prompt_payload(db: Session, submission: Submission) -> List[Dict[str, Any]]:
+    payload: List[Dict[str, Any]] = []
+    for item in submission.attachments_json or []:
+        payload.append(
+            {
+                "filename": item.get("filename") or "",
+                "source": "link",
+                "type": item.get("type") or "link",
+                "url": item.get("url") or "",
+            }
+        )
+
+    assets = (
+        db.query(SubmissionAttachmentAsset)
+        .options(joinedload(SubmissionAttachmentAsset.analysis))
+        .filter(SubmissionAttachmentAsset.submission_id == submission.id)
+        .order_by(SubmissionAttachmentAsset.created_at.asc())
+        .all()
+    )
+    for asset in assets:
+        analysis = asset.analysis
+        excerpt = None
+        if analysis and analysis.extracted_text:
+            excerpt = _truncate_compact_prompt_text(analysis.extracted_text, 240)
+        payload.append(
+            {
+                "filename": asset.original_filename,
+                "source": "upload",
+                "type": (asset.original_filename.rsplit(".", 1)[-1].lower() if "." in asset.original_filename else "file"),
+                "parsing_status": asset.parsing_status.value,
+                "summary_text": analysis.summary_text if analysis else None,
+                "excerpt": excerpt,
+                "error_msg": analysis.error_msg if analysis else None,
+            }
+        )
+    return payload
+
+
 def _classify_ai_assist_fallback_reason(error: Exception) -> str:
     lowered = f"{type(error).__name__}: {error}".lower()
     if "timeout" in lowered or "timed out" in lowered:
@@ -696,7 +735,7 @@ async def ai_assist_evaluation(
     if not submission_text:
         submission_text = json.dumps(content_json, ensure_ascii=False)
 
-    attachments = submission.attachments_json or []
+    attachments = _build_attachment_prompt_payload(db, submission)
     checkpoints = submission.checkpoints_json or {}
     warnings: List[str] = []
     submission_text = _truncate_ai_text(
